@@ -3181,21 +3181,103 @@ USER: "반가워요."
         return lum > 0.5 ? '#1d2129' : '#ffffff';
     }
 
-    // This module owns quota-aware writes to the application's localStorage data.
+    // This module owns the application's localStorage boundary: shape-guaranteed reads,
+    // quota-aware writes, and removal. Every outcome is reported to the caller.
+    //
+    // Reads live here rather than at the call sites because they used to be written as
+    // `JSON.parse(localStorage.getItem(key) || '[]')` in twenty places across init,
+    // presets and themes. That guard only covers an ABSENT key: one malformed stored
+    // value threw out of startup and out of every later list operation that repeated
+    // the same parse.
+            // The avatar caches are the largest disposable values the app stores, so they are
+            // what a quota retry sacrifices. Named here because the retry path and the reset
+            // path must agree on exactly which keys are disposable.
+            const DISPOSABLE_CACHE_KEYS = Object.freeze(['cachedBotAvatar', 'cachedPersonaAvatar']);
+
+            // Remembers the broken value already reported for each key. Startup and every
+            // later list operation repeat the same parse, and the user needs to hear about it
+            // once — but a DIFFERENT broken value is new information and is reported again.
+            const reportedBrokenValues = new Map();
+
+            // Single user-facing channel for this boundary, so tests can observe what the
+            // user was actually told and a future non-blocking toast replaces one function.
+            function notify(message) {
+                alert(message);
+            }
+
+            function reportBrokenValue(key, rawValue) {
+                if (reportedBrokenValues.get(key) === rawValue) return;
+                reportedBrokenValues.set(key, rawValue);
+                notify(`⚠️ 저장된 "${key}" 데이터를 읽을 수 없어 비어 있는 상태로 시작합니다.`);
+            }
+
+            // Always returns an array. Callers iterate the result, so neither a malformed
+            // string nor valid JSON of the wrong type may reach them as anything else.
+            function readJsonArray(key) {
+                let raw;
+                try {
+                    raw = localStorage.getItem(key);
+                } catch(e) {
+                    // Reading can fail as well when storage is disabled entirely.
+                    // An unusable store is an empty store, not a crash on startup.
+                    return [];
+                }
+
+                // No saved data yet is the ordinary first-run state, not a fault to report.
+                if (raw === null || raw === '') return [];
+
+                let parsed;
+                try {
+                    parsed = JSON.parse(raw);
+                } catch(e) {
+                    reportBrokenValue(key, raw);
+                    return [];
+                }
+
+                if (!Array.isArray(parsed)) {
+                    reportBrokenValue(key, raw);
+                    return [];
+                }
+                return parsed;
+            }
+
+            // Returns whether the value is now stored. Callers must check before announcing
+            // success: a quota failure used to alert the user and then let the caller alert
+            // '프리셋이 저장되었습니다!' immediately afterwards, with nothing written.
             function safeSetItem(key, value) {
                 try {
                     localStorage.setItem(key, value);
+                    return true;
                 } catch(e) {
                     if (e.name === 'QuotaExceededError' || e.code === 22) {
-                        // Clear avatar cache and retry
-                        localStorage.removeItem('cachedBotAvatar');
-                        localStorage.removeItem('cachedPersonaAvatar');
+                        // Free the disposable caches and retry once.
+                        for (const cacheKey of DISPOSABLE_CACHE_KEYS) {
+                            try {
+                                localStorage.removeItem(cacheKey);
+                            } catch(ignored) {}
+                        }
                         try {
                             localStorage.setItem(key, value);
-                            return;
-                        } catch(e2) {}
-                        alert('⚠️ 저장 공간이 부족합니다. 불필요한 프리셋을 삭제해 주세요.');
+                            return true;
+                        } catch(retryError) {
+                            notify('⚠️ 저장 공간이 부족합니다. 불필요한 프리셋을 삭제해 주세요.');
+                            return false;
+                        }
                     }
+                    // Anything else — SecurityError in private browsing, a disabled store —
+                    // used to be swallowed here with no message and no return value, so the
+                    // caller reported a save that never happened.
+                    notify('⚠️ 저장에 실패했습니다. 브라우저의 저장소 설정을 확인해 주세요.');
+                    return false;
+                }
+            }
+
+            function safeRemoveItem(key) {
+                try {
+                    localStorage.removeItem(key);
+                    return true;
+                } catch(e) {
+                    return false;
                 }
             }
 
@@ -3338,13 +3420,23 @@ USER: "반가워요."
     const HTML_ATTRIBUTE_ESCAPE_PATTERN = /[&<>"']/g;
 
     // Use this function to apply only body rules to HTML text locations.
+    // Imported and stored records reach these with fields that were never filled in, so a
+    // non-string argument is a boundary condition rather than a programming error. Calling
+    // .replace straight on it threw a TypeError out of rendering; an empty attribute is the
+    // deterministic result. Valid string output is untouched.
+    function toEscapableString(value) {
+        if (typeof value === 'string') return value;
+        if (value === null || value === undefined) return '';
+        return String(value);
+    }
+
     function escapeHtml(text) {
-        return text.replace(HTML_TEXT_ESCAPE_PATTERN, character => HTML_TEXT_ESCAPE_ENTITIES[character]);
+        return toEscapableString(text).replace(HTML_TEXT_ESCAPE_PATTERN, character => HTML_TEXT_ESCAPE_ENTITIES[character]);
     }
 
     // This function is used for values ​​inserted into HTML attributes wrapped in quotation marks to prevent attribute escape.
     function escapeHtmlAttribute(value) {
-        return value.replace(HTML_ATTRIBUTE_ESCAPE_PATTERN, character => HTML_ATTRIBUTE_ESCAPE_ENTITIES[character]);
+        return toEscapableString(value).replace(HTML_ATTRIBUTE_ESCAPE_PATTERN, character => HTML_ATTRIBUTE_ESCAPE_ENTITIES[character]);
     }
 
     /**
@@ -4156,14 +4248,14 @@ USER: "반가워요."
                     }
                 };
 
-                let savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                let savedThemes = readJsonArray('customThemes');
                 savedThemes.push(theme);
                 safeSetItem('customThemes', JSON.stringify(savedThemes));
                 renderSavedThemes();
             }
 
             function exportCustomThemes() {
-                const savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                const savedThemes = readJsonArray('customThemes');
                 if (savedThemes.length === 0) { alert('저장된 커스텀 테마가 없습니다.'); return; }
                 const blob = new Blob([JSON.stringify(savedThemes, null, 2)], { type: 'application/json' });
                 const link = document.createElement('a');
@@ -4178,9 +4270,9 @@ USER: "반가워요."
                     try {
                         const imported = JSON.parse(event.target.result);
                         if (!Array.isArray(imported)) { alert('올바른 테마 파일이 아닙니다.'); return; }
-                        const existing = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                        const existing = readJsonArray('customThemes');
                         const merged = existing.concat(imported);
-                        safeSetItem('customThemes', JSON.stringify(merged));
+                        if (!safeSetItem('customThemes', JSON.stringify(merged))) return;
                         renderSavedThemes();
                         alert(`${imported.length}개 테마를 가져왔습니다!`);
                     } catch(e) { alert('테마 파일을 읽는 중 오류가 발생했습니다.'); }
@@ -4190,7 +4282,7 @@ USER: "반가워요."
 
             function renderSavedThemes() {
                 const container = document.getElementById('saved-themes');
-                const savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                const savedThemes = readJsonArray('customThemes');
 
                 if (savedThemes.length === 0) {
                     container.innerHTML = '';
@@ -4209,7 +4301,7 @@ USER: "반가워요."
             }
 
             function loadCustomTheme(index) {
-                const savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                const savedThemes = readJsonArray('customThemes');
                 const theme = savedThemes[index];
                 if (!theme) return;
 
@@ -4277,7 +4369,7 @@ USER: "반가워요."
             }
 
             function updateCustomTheme(index) {
-                const savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                const savedThemes = readJsonArray('customThemes');
                 const theme = savedThemes[index];
                 if (!theme) return;
 
@@ -4318,13 +4410,13 @@ USER: "반가워요."
                     }
                 };
 
-                safeSetItem('customThemes', JSON.stringify(savedThemes));
+                if (!safeSetItem('customThemes', JSON.stringify(savedThemes))) return;
                 renderSavedThemes();
                 alert('테마가 수정되었습니다!');
             }
 
             function renameCustomTheme(index) {
-                let savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                let savedThemes = readJsonArray('customThemes');
                 const theme = savedThemes[index];
                 if (!theme) return;
                 const newName = prompt('새 테마 이름을 입력하세요:', theme.name);
@@ -4335,7 +4427,7 @@ USER: "반가워요."
             }
 
             function deleteCustomTheme(index) {
-                let savedThemes = JSON.parse(localStorage.getItem('customThemes') || '[]');
+                let savedThemes = readJsonArray('customThemes');
                 savedThemes.splice(index, 1);
                 safeSetItem('customThemes', JSON.stringify(savedThemes));
                 renderSavedThemes();
@@ -4384,6 +4476,55 @@ USER: "반가워요."
         return CHARACTER_PREFIX_PATTERN.test(line) || DIALOGUE_PREFIX_PATTERN.test(line);
     }
 
+    // Owns the invariant for the extra-character array.
+
+    const DEFAULT_CHARACTER_COLORS = Object.freeze({
+        bgColor: '#e9ecef',
+        textColor: '#1d2129',
+        nameColor: '#868e96',
+        commColor: '#20c997'
+    });
+
+    const AVATAR_SHAPES = Object.freeze(['rounded', 'circle']);
+    const DEFAULT_AVATAR_SHAPE = 'rounded';
+
+    const SIX_DIGIT_HEX = /^#[0-9a-fA-F]{6}$/;
+
+    // Case is preserved rather than normalized: the colour pickers already emit one form,
+    // and rewriting it would change pinned render output for no correctness gain.
+    function normalizeHexColor(value, fallback) {
+        if (typeof value !== 'string') return fallback;
+        const trimmed = value.trim();
+        return SIX_DIGIT_HEX.test(trimmed) ? trimmed : fallback;
+    }
+
+    function normalizeText(value) {
+        return typeof value === 'string' ? value : '';
+    }
+
+    function normalizeExtraCharacters(value) {
+        if (!Array.isArray(value)) return [];
+
+        return value
+            .filter(character => Boolean(character) && typeof character === 'object' && !Array.isArray(character))
+            .map((character, index) => ({
+                // Derived from position, never from the stored value. Deleting a character
+                // already renumbers the rest, so position is the only id that stays true.
+                id: formatCharacterId(index),
+                name: typeof character.name === 'string' ? character.name : `캐릭터${index + 1}`,
+                bgColor: normalizeHexColor(character.bgColor, DEFAULT_CHARACTER_COLORS.bgColor),
+                textColor: normalizeHexColor(character.textColor, DEFAULT_CHARACTER_COLORS.textColor),
+                nameColor: normalizeHexColor(character.nameColor, DEFAULT_CHARACTER_COLORS.nameColor),
+                commColor: normalizeHexColor(character.commColor, DEFAULT_CHARACTER_COLORS.commColor),
+                avatarData: normalizeText(character.avatarData),
+                avatarShape: AVATAR_SHAPES.includes(character.avatarShape)
+                    ? character.avatarShape
+                    : DEFAULT_AVATAR_SHAPE,
+                bio: normalizeText(character.bio),
+                _open: character._open === true
+            }));
+    }
+
     // This app-layer module owns canvas-based avatar cropping and cache-size reduction.
             // Crop + resize avatar image square (maintains same ratio even if Arca changes CSS)
             function resizeImageForCache(dataUrl, maxSize, callback) {
@@ -4409,6 +4550,59 @@ USER: "반가워요."
                     resizeImageForCache(dataUrl, maxSize, resolve);
                 });
             }
+
+    // Owns the stored grammar for character links, and with it the question of which link
+    // is the primary one.
+    //
+    // A link's role lives in its record: `name === null` marks the primary link, which is
+    // the one labelled with the AI's name. It does NOT live in the array position. Empty
+    // rows are filtered out before a link list is built, so leaving the primary row blank
+    // and filling a named row puts a NAMED link at position 0 -- and position-based code
+    // then relabelled it with the AI's name, serialized it as a bare URL, and lost the name
+    // the user typed. Reloading turned it into a primary link.
+    //
+    // The stored format is line based and unchanged:
+    //   a line without a separator  -> the primary link, bare URL
+    //   `name|url`                  -> an additional, named link
+    // so presets written before this module still load exactly as they did.
+
+    const SEPARATOR = '|';
+
+    function serializeCharacterLinks(links) {
+        return (links || [])
+            .map(link => (link.name === null ? link.url : `${link.name}${SEPARATOR}${link.url}`))
+            .join('\n');
+    }
+
+    function parseCharacterLinks(value) {
+        // Imported presets can carry anything in this field, and a non-string would throw at
+        // .split. No links is the defined result of an unreadable link list.
+        if (typeof value !== 'string' || !value) return [];
+
+        const lines = value.split('\n').map(line => line.trim()).filter(line => line);
+        let primaryTaken = false;
+
+        return lines.map(line => {
+            const separatorAt = line.indexOf(SEPARATOR);
+            if (separatorAt !== -1) {
+                return {
+                    name: line.slice(0, separatorAt).trim(),
+                    // Everything after the FIRST separator, because a URL may contain one.
+                    url: line.slice(separatorAt + 1).trim()
+                };
+            }
+
+            if (!primaryTaken) {
+                primaryTaken = true;
+                return { name: null, url: line };
+            }
+
+            // There is only one primary row, so a second bare line cannot be a second
+            // primary. It becomes a nameless extra -- what the previous format did with
+            // it -- rather than silently replacing the real primary.
+            return { name: '', url: line };
+        });
+    }
 
     // ========== Preview/HTML Toggle ==========
             let isHtmlMode = false;
@@ -4572,23 +4766,21 @@ USER: "반가워요."
                 const firstInput = container.querySelector('.char-link-input');
                 if (firstInput) firstInput.value = '';
                 if (!charLinkValue) return;
-                // Compatible with previous textarea format (line break delimited)
-                const lines = charLinkValue.split('\n').map(l => l.trim()).filter(l => l);
-                lines.forEach((line, idx) => {
-                    if (idx === 0) {
-                        if (firstInput) firstInput.value = line;
-                    } else {
-                        addCharLinkRow();
-                        const newRows = container.querySelectorAll('.char-link-row');
-                        const lastRow = newRows[newRows.length - 1];
-                        const parts = line.split('|');
-                        if (parts.length >= 2) {
-                            lastRow.querySelector('.char-link-name').value = parts[0].trim();
-                            lastRow.querySelector('.char-link-url').value = parts.slice(1).join('|').trim();
-                        } else {
-                            lastRow.querySelector('.char-link-url').value = line;
-                        }
+
+                // The stored grammar is owned by src/js/modules/character-links.js. Which row
+                // a link belongs in follows its parsed identity, not its line number: a preset
+                // whose only link is a named one leaves the primary row empty rather than
+                // promoting that link and discarding its name.
+                parseCharacterLinks(charLinkValue).forEach(link => {
+                    if (link.name === null) {
+                        if (firstInput) firstInput.value = link.url;
+                        return;
                     }
+                    addCharLinkRow();
+                    const newRows = container.querySelectorAll('.char-link-row');
+                    const lastRow = newRows[newRows.length - 1];
+                    lastRow.querySelector('.char-link-name').value = link.name;
+                    lastRow.querySelector('.char-link-url').value = link.url;
                 });
             }
 
@@ -4617,8 +4809,11 @@ USER: "반가워요."
             }
 
             // A setter for restoring additional character state owned by the characters module from the init module.
+            // Normalized at the boundary. The same records feed both renderers and the
+            // settings panel, so guaranteeing the shape once here is what lets those three
+            // emit without each defending separately against imported data.
             function setExtraCharacters(value) {
-                extraCharacters = value;
+                extraCharacters = normalizeExtraCharacters(value);
             }
 
             // This is a getter for other modules to read the bot avatar state owned by the characters module.
@@ -4709,7 +4904,7 @@ USER: "반가워요."
                                 <label class="input-label">프로필 사진</label>
                                 <input type="file" accept="image/*" onchange="handleExtraCharAvatar(${index}, this)">
                                 <div style="display:flex;align-items:center;gap:6px;margin-top:8px;">
-                                    <img id="extra-char-avatar-preview-${index}" src="${char.avatarData || ''}" style="display:${char.avatarData ? 'block' : 'none'};width:68px;height:68px;object-fit:cover;border-radius:${char.avatarShape === 'circle' ? '999px' : '16px'};border:1px solid var(--input-border);">
+                                    <img id="extra-char-avatar-preview-${index}" src="${escapeHtmlAttribute(char.avatarData)}" style="display:${char.avatarData ? 'block' : 'none'};width:68px;height:68px;object-fit:cover;border-radius:${char.avatarShape === 'circle' ? '999px' : '16px'};border:1px solid var(--input-border);">
                                     ${char.avatarData ? '<button onclick="removeExtraCharAvatar(' + index + ')" style="padding:4px 8px;background:#e03131;color:white;border:none;border-radius:6px;cursor:pointer;font-size:11px;">×</button>' : ''}
                                 </div>
                                 <select onchange="updateExtraCharAvatarShape(${index}, this.value)"
@@ -4963,6 +5158,13 @@ USER: "반가워요."
                 textarea.addEventListener('focus', () => {
                     lastFocusedTextarea = textarea;
                 });
+
+                // Block labels, dividers and every other block-count-derived output are stale
+                // the moment the count changes. deleteBlock already requested a render; adding
+                // did not, so the preview disagreed with the editor until an unrelated later
+                // render happened to catch up. Requested here, after the block and its
+                // listeners are installed, so the renderer sees the finished element.
+                requestLogRender();
             }
 
             function deleteBlock(btn) {
@@ -5325,33 +5527,75 @@ USER: "반가워요."
                 uploadedImages = value;
             } // {data: base64, blockNumber: number, position: 'before'|'after'|'inline', name: string}
 
+            const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+            // Resolves to an outcome per file rather than rejecting, so one unreadable file in
+            // a batch cannot discard the files that read fine.
+            function readImageFile(file) {
+                return new Promise(resolve => {
+                    const reader = new FileReader();
+                    reader.onload = event => resolve({ ok: true, name: file.name, data: event.target.result });
+                    reader.onerror = () => resolve({ ok: false, name: file.name });
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            // Reads an entire selection concurrently but appends it in SELECTION order.
+            //
+            // The old code pushed from inside each reader's onload and computed the block
+            // number there, so both the array position and the block number followed I/O
+            // completion: picking two files and having the second decode faster silently
+            // swapped them. Selection order is the only stable statement of user intent
+            // available here, so the append and the numbering both wait for every read.
+            async function ingestImageFiles(fileList) {
+                const accepted = Array.from(fileList || []).filter(file => {
+                    if (file.size > MAX_IMAGE_BYTES) {
+                        alert(`파일 "${file.name}"의 크기가 5MB를 초과합니다.`);
+                        return false;
+                    }
+                    return true;
+                });
+                if (accepted.length === 0) return [];
+
+                const results = await Promise.all(accepted.map(readImageFile));
+
+                // Assigned once, after every read settled. A failed read does not consume a
+                // number, so the images that did arrive stay consecutive.
+                let nextBlockNumber = uploadedImages.length > 0
+                    ? Math.max(...uploadedImages.map(image => image.blockNumber)) + 1
+                    : 1;
+
+                const added = [];
+                for (const result of results) {
+                    if (!result.ok) {
+                        alert(`파일 "${result.name}"을(를) 읽지 못했습니다.`);
+                        continue;
+                    }
+                    const image = {
+                        data: result.data,
+                        blockNumber: nextBlockNumber,
+                        position: 'before', // Default: Before block
+                        name: result.name
+                    };
+                    nextBlockNumber += 1;
+                    uploadedImages.push(image);
+                    added.push(image);
+                }
+
+                if (added.length > 0) {
+                    renderImageList();
+                    requestLogRender();
+                }
+                return added;
+            }
+
             document.getElementById('image-file-input').addEventListener('change', function (e) {
                 const files = e.target.files;
                 if (!files.length) return;
 
-                Array.from(files).forEach(file => {
-                    if (file.size > 5 * 1024 * 1024) {
-                        alert(`파일 "${file.name}"의 크기가 5MB를 초과합니다.`);
-                        return;
-                    }
-
-                    const reader = new FileReader();
-                    reader.onload = function (event) {
-                        // Automatically assign next block number (largest number of existing image + 1, or 1)
-                        const nextBlockNum = uploadedImages.length > 0
-                            ? Math.max(...uploadedImages.map(img => img.blockNumber)) + 1
-                            : 1;
-                        uploadedImages.push({
-                            data: event.target.result,
-                            blockNumber: nextBlockNum,
-                            position: 'before', // Default: Before block
-                            name: file.name
-                        });
-                        renderImageList();
-                        requestLogRender();
-                    };
-                    reader.readAsDataURL(file);
-                });
+                // Not awaited: this is a DOM event handler, and ingestImageFiles reports each
+                // file's outcome itself rather than rejecting.
+                ingestImageFiles(files);
 
                 // Initialize input (so you can select the same file again)
                 e.target.value = '';
@@ -5640,11 +5884,17 @@ USER: "반가워요."
     function createCharacterLinkDisplayModel(charLinks, primaryCharacterName) {
         return {
             hasLinks: charLinks.length > 0,
-            links: charLinks.map((link, index) => ({
-                name: index === 0 ? primaryCharacterName : link.name || '',
-                url: link.url,
-                isPrimary: index === 0
-            }))
+            // `name === null` is the primary marker, per src/js/modules/character-links.js.
+            // Position says nothing: empty rows are filtered out before this point, so a
+            // named additional link can legitimately arrive at index 0.
+            links: charLinks.map(link => {
+                const isPrimary = link.name === null;
+                return {
+                    name: isPrimary ? primaryCharacterName : link.name || '',
+                    url: link.url,
+                    isPrimary
+                };
+            })
         };
     }
 
@@ -5894,7 +6144,7 @@ USER: "반가워요."
                     if (profileCardModel.bot.show) {
                         html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:50%;max-width:50%;box-sizing:border-box;">';
                         if (profileCardModel.bot.showAvatar) {
-                            html += `<img src="${botAvatar}" alt="bot avatar" class="${botAvatarClass}">`;
+                            html += `<img src="${escapeHtmlAttribute(botAvatar)}" alt="bot avatar" class="${botAvatarClass}">`;
                         }
                         html += `<div class="persona-name persona-name-bot" style="color:${pvProfileNameColor}">${escapeHtml(aiName)}</div>`;
                         if (profileCardModel.bot.showBio) {
@@ -5906,7 +6156,7 @@ USER: "반가워요."
                     if (profileCardModel.persona.show) {
                         html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:50%;max-width:50%;box-sizing:border-box;">';
                         if (profileCardModel.persona.showAvatar) {
-                            html += `<img src="${personaAvatar}" alt="persona avatar" class="${personaAvatarClass}">`;
+                            html += `<img src="${escapeHtmlAttribute(personaAvatar)}" alt="persona avatar" class="${personaAvatarClass}">`;
                         }
                         html += `<div class="persona-name persona-name-user" style="color:${pvProfileNamePersonaColor}">${escapeHtml(userName)}</div>`;
                         if (profileCardModel.persona.showBio) {
@@ -5926,7 +6176,7 @@ USER: "반가워요."
                         const avatarClass = profile.isCircle ? 'persona-avatar circle' : 'persona-avatar';
                         html += '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 calc((100% - 24px) / 2);max-width:calc((100% - 24px) / 2);min-width:0;box-sizing:border-box;">';
                         if (profile.showAvatar) {
-                            html += `<img src="${char.avatarData}" alt="${escapeHtmlAttribute(char.name)} avatar" class="${avatarClass}">`;
+                            html += `<img src="${escapeHtmlAttribute(char.avatarData)}" alt="${escapeHtmlAttribute(char.name)} avatar" class="${avatarClass}">`;
                         }
                         html += `<div class="persona-name" style="color:${char.nameColor};max-width:100%;overflow-wrap:anywhere;">${escapeHtml(char.name)}</div>`;
                         if (profile.showBio) {
@@ -5940,7 +6190,7 @@ USER: "반가워요."
                 // Image assigned to block number 0 (immediately below the title) - position is irrelevant
                 const headerImages = selectImagesForSlot(getUploadedImages(), IMAGE_SLOT_HEADER);
                 headerImages.forEach(img => {
-                    html += `<div class="log-image"><img src="${img.data}" alt="Image"></div>`;
+                    html += `<div class="log-image"><img src="${escapeHtmlAttribute(img.data)}" alt="Image"></div>`;
                 });
 
                 // Process while traversing each block
@@ -5951,7 +6201,7 @@ USER: "반가워요."
                     // Images to be inserted before this block (position === 'before')
                     const beforeImages = selectImagesForSlot(getUploadedImages(), IMAGE_SLOT_BEFORE, blockNumber);
                     beforeImages.forEach(img => {
-                        html += `<div class="log-image"><img src="${img.data}" alt="Image"></div>`;
+                        html += `<div class="log-image"><img src="${escapeHtmlAttribute(img.data)}" alt="Image"></div>`;
                     });
 
                     // Separator line between blocks (if not the first block)
@@ -6076,7 +6326,7 @@ USER: "반가워요."
                                 currentSpeaker = null;
                                 currentSpeakerType = null;
                                 lastWasNarration = false;
-                                html += `<div class="log-image inline-image"><img src="${matchedImage.data}" alt="${escapeHtmlAttribute(matchedImage.name)}"></div>`;
+                                html += `<div class="log-image inline-image"><img src="${escapeHtmlAttribute(matchedImage.data)}" alt="${escapeHtmlAttribute(matchedImage.name)}"></div>`;
                                 return;
                             }
                         }
@@ -6206,7 +6456,7 @@ USER: "반가워요."
                     // Images to be inserted after this block (position === 'after')
                     const afterImages = selectImagesForSlot(getUploadedImages(), IMAGE_SLOT_AFTER, blockNumber);
                     afterImages.forEach(img => {
-                        html += `<div class="log-image"><img src="${img.data}" alt="Image"></div>`;
+                        html += `<div class="log-image"><img src="${escapeHtmlAttribute(img.data)}" alt="Image"></div>`;
                     });
                 });
 
@@ -6316,6 +6566,79 @@ USER: "반가워요."
                 });
             }
 
+    // Decides what applying a preset should do to the rule list and to block colours.
+    //
+    // The distinction this module exists for: a preset field that is ABSENT means "this
+    // preset predates the field, keep what you have", while a field that is PRESENT --
+    // even as an empty list -- is an instruction to end up holding exactly that content.
+    // The application code used to conflate the two, so applying a preset with no rules
+    // left the previous preset's rules on screen, and applying a cleared block colour
+    // left the previous colour on the block.
+
+    // A preset field is an instruction only when the preset actually carries it.
+    function isPresent(value) {
+        return value !== undefined && value !== null;
+    }
+
+    // A rule without a find pattern cannot be applied, so it is not a rule.
+    function isUsableRule(rule) {
+        return Boolean(rule)
+            && typeof rule === 'object'
+            && typeof rule.find === 'string'
+            && rule.find !== '';
+    }
+
+    function resolveRegexRuleTransition(presetRules) {
+        if (!isPresent(presetRules)) return { replace: false, rules: [] };
+
+        // A present but unusable collection still says "this preset defines its rules".
+        // The defined result of an unreadable definition is no rules -- never a silent
+        // fall-through to whatever the previously applied preset left behind.
+        const source = Array.isArray(presetRules) ? presetRules : [];
+
+        return {
+            replace: true,
+            rules: source.filter(isUsableRule).map(rule => ({
+                find: rule.find,
+                replace: typeof rule.replace === 'string' ? rule.replace : ''
+            }))
+        };
+    }
+
+    // The current selection is stored as an ARRAY INDEX, so any deletion that shifts the
+    // array invalidates it. Returns the index that still addresses the same preset, or null
+    // when there is no longer a selection to keep.
+    function getLastPresetIndexAfterDelete(currentIndex, deletedIndex, remainingCount) {
+        // A stored value that is not a usable index is not a selection.
+        if (!Number.isInteger(currentIndex) || currentIndex < 0) return null;
+
+        // The selected preset itself is gone. Its neighbour slid into that slot, but the
+        // user never chose the neighbour, so the honest result is no selection.
+        if (deletedIndex === currentIndex) return null;
+
+        const next = deletedIndex < currentIndex ? currentIndex - 1 : currentIndex;
+
+        // A stored index can outlive the array it referred to.
+        return next < remainingCount ? next : null;
+    }
+
+    // Returns exactly one instruction per block currently on screen: a colour to apply, or
+    // null to clear that block. The length always matches blockCount, so callers never have
+    // to reason about a short saved list quietly leaving stale colours on trailing blocks.
+    function resolveBlockColorTransition(presetColors, blockCount) {
+        if (!isPresent(presetColors)) return { replace: false, colors: [] };
+
+        const source = Array.isArray(presetColors) ? presetColors : [];
+        const colors = [];
+        for (let index = 0; index < blockCount; index++) {
+            const value = source[index];
+            // An empty string is a cleared colour, not a missing instruction. Treating it
+            // as missing is what left the previous preset's colour on the block.
+            colors.push(typeof value === 'string' && value !== '' ? value : null);
+        }
+        return { replace: true, colors };
+    }
+
     // ========== Select outer theme ==========
             document.getElementById('frame-select').addEventListener('change', function () {
                 const preview = document.getElementById('log-preview');
@@ -6386,7 +6709,7 @@ USER: "반가워요."
                         translation: document.getElementById('translation-input').value,
                         nameAi: document.getElementById('name-ai').value,
                         nameUser: document.getElementById('name-user').value,
-                        charLink: getCharLinks().map((l, i) => i === 0 ? l.url : (l.name + '|' + l.url)).join('\n'),
+                        charLink: serializeCharacterLinks(getCharLinks()),
                         botAvatar: getBotAvatarData(),
                         botAvatarShape: document.getElementById('bot-avatar-shape').value,
                         botBio: document.getElementById('bot-bio').value,
@@ -6403,7 +6726,7 @@ USER: "반가워요."
 
             function renderPresetListPanel() {
                 const container = document.getElementById('preset-list-panel');
-                const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                const savedPresets = readJsonArray('logPresets');
 
                 if (savedPresets.length === 0) {
                     container.innerHTML = '<div class="preset-empty">저장된 프리셋이 없습니다.<br>상단의 "저장" 버튼으로 현재 설정을 저장하세요.</div>';
@@ -6551,10 +6874,13 @@ USER: "반가워요."
                     }
                 }
 
-                // Load regular expression rules
-                if (preset.regexRules && preset.regexRules.length > 0) {
+                // Load regular expression rules.
+                // Replacement, not addition: a preset that carries an empty list is saying
+                // "no rules", and the previous preset's rows must not survive it.
+                const ruleTransition = resolveRegexRuleTransition(preset.regexRules);
+                if (ruleTransition.replace) {
                     document.getElementById('rule-list').innerHTML = '';
-                    preset.regexRules.forEach(rule => {
+                    ruleTransition.rules.forEach(rule => {
                         addRule(rule.find, rule.replace);
                     });
                 }
@@ -6562,11 +6888,17 @@ USER: "반가워요."
                 // Load block folding options
                 document.getElementById('block-folding').checked = preset.blockFolding !== false;
 
-                // Restore block color
-                if (preset.blockColors && Array.isArray(preset.blockColors)) {
-                    const blocks = document.querySelectorAll('.log-block');
-                    preset.blockColors.forEach((color, i) => {
-                        if (blocks[i] && color) {
+                // Restore block color.
+                // The transition carries one instruction per block on screen, so a saved list
+                // that is short or holds a cleared entry still clears those blocks instead of
+                // leaving the previously applied colour on them.
+                const blocks = document.querySelectorAll('.log-block');
+                const colorTransition = resolveBlockColorTransition(preset.blockColors, blocks.length);
+                if (colorTransition.replace) {
+                    colorTransition.colors.forEach((color, i) => {
+                        if (color === null) {
+                            delete blocks[i].dataset.blockColor;
+                        } else {
                             blocks[i].dataset.blockColor = color;
                         }
                     });
@@ -6600,7 +6932,7 @@ USER: "반가워요."
             }
 
             async function updatePresetFromPanel(index) {
-                const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                const savedPresets = readJsonArray('logPresets');
                 const oldPreset = savedPresets[index];
                 if (!oldPreset) return;
 
@@ -6619,23 +6951,54 @@ USER: "반가워요."
 
                 savedPresets[index] = newPreset;
 
-                safeSetItem('logPresets', JSON.stringify(savedPresets));
+                if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return;
                 renderPresetListPanel();
                 alert('프리셋이 수정되었습니다!');
             }
 
+            // The current selection is stored as an array index. Reading it in one place keeps
+            // the "an unusable stored value is not a selection" decision from being repeated,
+            // and differently, at each call site.
+            function readSelectedPresetIndex() {
+                let raw;
+                try {
+                    raw = localStorage.getItem('lastPresetIndex');
+                } catch(e) {
+                    return null;
+                }
+                if (raw === null || raw === '') return null;
+                const parsed = Number.parseInt(raw, 10);
+                return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+            }
+
             function deletePresetFromPanel(index) {
-                const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                const savedPresets = readJsonArray('logPresets');
                 const preset = savedPresets[index];
+                // The panel can outlive the array it was rendered from.
+                if (!preset) return;
                 if (!confirm(`"${preset.name}" 프리셋을 삭제하시겠습니까?`)) return;
 
                 savedPresets.splice(index, 1);
-                safeSetItem('logPresets', JSON.stringify(savedPresets));
+                // Repair the stored selection only AFTER the array write succeeds. Doing it
+                // first would leave the index describing a deletion that never happened.
+                if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return;
+
+                const nextIndex = getLastPresetIndexAfterDelete(
+                    readSelectedPresetIndex(),
+                    index,
+                    savedPresets.length
+                );
+                if (nextIndex === null) {
+                    safeRemoveItem('lastPresetIndex');
+                } else {
+                    safeSetItem('lastPresetIndex', nextIndex);
+                }
+
                 renderPresetListPanel();
             }
 
             function exportPreset() {
-                const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                const savedPresets = readJsonArray('logPresets');
                 const exportData = {
                     type: 'log-cupcake-presets',
                     version: 1,
@@ -6740,41 +7103,71 @@ USER: "반가워요."
                 // Initialize regular expression rules
                 document.getElementById('rule-list').innerHTML = '';
 
+                // These outlive the screen. The avatar caches and the current-selection index
+                // used to survive a reset and come back on the next reload, which made the
+                // reset look like it had silently undone itself. The saved presets and themes
+                // are the user's library, not input state, and stay untouched.
+                safeRemoveItem('lastPresetIndex');
+                for (const cacheKey of DISPOSABLE_CACHE_KEYS) {
+                    safeRemoveItem(cacheKey);
+                }
+
                 // Reset preview
                 requestLogRender();
 
                 alert('초기화되었습니다!');
             }
 
-    // ========== Copy style (direct paste) ==========
+    // The single awaited way to put text on the clipboard. Both buttons end here, so a
+            // refused permission is one ordinary negative outcome rather than an unhandled
+            // promise rejection in two different shapes.
+            async function writeClipboardText(text) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                } catch(e) {
+                    return false;
+                }
+            }
+
+            // ========== Copy style (direct paste) ==========
+            // Resolves to whether the export reached the clipboard by any route.
             async function copyStyled() {
                 const html = generateArcaHTML();
 
                 try {
-                    // Copy to HTML format with ClipboardItem API
-                    const htmlBlob = new Blob([html], { type: 'text/html' });
-                    const textBlob = new Blob([html], { type: 'text/plain' });
-
+                    // Rich copy, so a paste into the Arca editor keeps its styling.
                     const clipboardItem = new ClipboardItem({
-                        'text/html': htmlBlob,
-                        'text/plain': textBlob
+                        'text/html': new Blob([html], { type: 'text/html' }),
+                        'text/plain': new Blob([html], { type: 'text/plain' })
                     });
-
                     await navigator.clipboard.write([clipboardItem]);
-                    alert('복사 완료! 🧁\n아카라이브에 바로 붙여넣기 하세요!');
-                } catch (e) {
-                    // If ClipboardItem is not supported, fall back to the existing method.
-                    console.error('ClipboardItem failed:', e);
-                    copyArcaHTML();
+                } catch(e) {
+                    // Either this browser has no ClipboardItem, or the rich write was refused.
+                    // Both are supported paths, and the plain fallback must be AWAITED: the old
+                    // code called it and returned, so its rejection escaped as an unhandled
+                    // promise and the user was told nothing at all.
+                    return copyArcaHTML();
                 }
+
+                // Announced outside the try on purpose. Inside it, a throwing alert would be
+                // caught as a copy failure and trigger a redundant second copy.
+                alert('복사 완료! 🧁\n아카라이브에 바로 붙여넣기 하세요!');
+                return true;
             }
 
             // ========== Copy HTML for Arca Live ==========
-            function copyArcaHTML() {
+            // Resolves to whether the export reached the clipboard.
+            async function copyArcaHTML() {
                 const html = generateArcaHTML();
-                navigator.clipboard.writeText(html).then(() => {
-                    alert('아카라이브용 HTML이 복사되었습니다!\n\n붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
-                });
+
+                if (!await writeClipboardText(html)) {
+                    alert('클립보드 복사에 실패했습니다.\n브라우저의 클립보드 권한을 확인해 주세요.');
+                    return false;
+                }
+
+                alert('아카라이브용 HTML이 복사되었습니다!\n\n붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
+                return true;
             }
 
             function generateArcaHTML() {
@@ -6926,7 +7319,7 @@ USER: "반가워요."
                     if (profileCardModel.bot.show) {
                         html += `<td style="width:50%;text-align:center;vertical-align:top;padding:0 8px 8px 8px;border:none;">`;
                         if (profileCardModel.bot.showAvatar) {
-                            html += `<img src="${botAvatar}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${botAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
+                            html += `<img src="${escapeHtmlAttribute(botAvatar)}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${botAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
                         }
                         html += `<div style="font-size:1.05em;font-weight:700;color:${profileNameColor} !important;">${escapeHtml(aiName)}</div>`;
                         if (profileCardModel.bot.showBio) {
@@ -6937,7 +7330,7 @@ USER: "반가워요."
                     if (profileCardModel.persona.show) {
                         html += `<td style="width:50%;text-align:center;vertical-align:top;padding:0 8px 8px 8px;border:none;">`;
                         if (profileCardModel.persona.showAvatar) {
-                            html += `<img src="${personaAvatar}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${personaAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
+                            html += `<img src="${escapeHtmlAttribute(personaAvatar)}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${personaAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
                         }
                         html += `<div style="font-size:1.05em;font-weight:700;color:${profileNamePersonaColor} !important;">${escapeHtml(userName)}</div>`;
                         if (profileCardModel.persona.showBio) {
@@ -6960,7 +7353,7 @@ USER: "반가워요."
                         const charAvatarRadius = profile.isCircle ? '999px' : '20px';
                         html += `<td style="width:50%;text-align:center;vertical-align:top;padding:0 8px 8px 8px;border:none;">`;
                         if (profile.showAvatar) {
-                            html += `<img src="${char.avatarData}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${charAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
+                            html += `<img src="${escapeHtmlAttribute(char.avatarData)}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${charAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
                         }
                         html += `<div style="font-size:1.05em;font-weight:700;color:${char.nameColor} !important;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(char.name)}</div>`;
                         if (profile.showBio) {
@@ -6976,7 +7369,7 @@ USER: "반가워요."
                 // Block 0 image (below the title)
                 const headerImages = selectImagesForSlot(getUploadedImages(), IMAGE_SLOT_HEADER);
                 headerImages.forEach(img => {
-                    html += `<div style="text-align:center;margin:16px 0;"><img src="${img.data}" style="max-width:100%;border-radius:8px;margin:0 auto;"></div>`;
+                    html += `<div style="text-align:center;margin:16px 0;"><img src="${escapeHtmlAttribute(img.data)}" style="max-width:100%;border-radius:8px;margin:0 auto;"></div>`;
                 });
 
                 // Process each block
@@ -6996,7 +7389,7 @@ USER: "반가워요."
                     // Image to insert before this block (position === 'before' only)
                     const blockImages = selectImagesForSlot(getUploadedImages(), IMAGE_SLOT_BEFORE, blockNumber);
                     blockImages.forEach(img => {
-                        html += `<div style="text-align:center;margin:16px 0;"><img src="${img.data}" style="max-width:100%;border-radius:8px;margin:0 auto;"></div>`;
+                        html += `<div style="text-align:center;margin:16px 0;"><img src="${escapeHtmlAttribute(img.data)}" style="max-width:100%;border-radius:8px;margin:0 auto;"></div>`;
                     });
 
                     // dividing line between blocks
@@ -7089,7 +7482,7 @@ USER: "반가워요."
                                 currentSpeaker = null;
                                 currentSpeakerType = null;
                                 lastWasNarrationArca = false;
-                                html += `<div style="text-align:center;margin:16px 0;"><img src="${matchedImage.data}" style="max-width:100%;border-radius:8px;margin:0 auto;" alt="${escapeHtmlAttribute(matchedImage.name)}"></div>`;
+                                html += `<div style="text-align:center;margin:16px 0;"><img src="${escapeHtmlAttribute(matchedImage.data)}" style="max-width:100%;border-radius:8px;margin:0 auto;" alt="${escapeHtmlAttribute(matchedImage.name)}"></div>`;
                                 return;
                             }
                         }
@@ -7253,7 +7646,7 @@ USER: "반가워요."
                     // Image to insert after this block (position === 'after')
                     const afterImages = selectImagesForSlot(getUploadedImages(), IMAGE_SLOT_AFTER, blockNumber);
                     afterImages.forEach(img => {
-                        html += `<div style="text-align:center;margin:16px 0;"><img src="${img.data}" style="max-width:100%;border-radius:8px;margin:0 auto;"></div>`;
+                        html += `<div style="text-align:center;margin:16px 0;"><img src="${escapeHtmlAttribute(img.data)}" style="max-width:100%;border-radius:8px;margin:0 auto;"></div>`;
                     });
 
                     // Block fold end
@@ -7429,10 +7822,10 @@ AI: 빙그레 웃는다`;
                 renderPresetListPanel(); // Preset panel rendering
 
                 // Load last selected preset
-                const lastPresetIndex = localStorage.getItem('lastPresetIndex');
+                const lastPresetIndex = readSelectedPresetIndex();
                 if (lastPresetIndex !== null) {
-                    const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
-                    const preset = savedPresets[parseInt(lastPresetIndex)];
+                    const savedPresets = readJsonArray('logPresets');
+                    const preset = savedPresets[lastPresetIndex];
                     if (preset) {
                         applyPresetData(preset);
                     }
@@ -7460,7 +7853,7 @@ AI: 빙그레 웃는다`;
                                 return;
                             }
 
-                            const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                            const savedPresets = readJsonArray('logPresets');
                             const firstImportedIndex = savedPresets.length;
                             savedPresets.push(...importedPresets);
                             safeSetItem('logPresets', JSON.stringify(savedPresets));
@@ -7523,15 +7916,18 @@ AI: 빙그레 웃는다`;
                     preset.input.personaAvatar = await resizeImagePromise(preset.input.personaAvatar, 320);
                 }
 
-                let savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                let savedPresets = readJsonArray('logPresets');
                 savedPresets.push(preset);
-                safeSetItem('logPresets', JSON.stringify(savedPresets));
+                // The gateway has already said why a failed save failed. Re-rendering the
+                // panel and announcing success on top of that would contradict it with a
+                // preset the user can see but that is not actually stored.
+                if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return;
                 renderPresetListPanel();
                 alert('프리셋이 저장되었습니다!');
             }
 
             function loadPresetFromPanel(index) {
-                const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                const savedPresets = readJsonArray('logPresets');
                 const preset = savedPresets[index];
                 if (!preset) return;
 
@@ -7542,7 +7938,7 @@ AI: 빙그레 웃는다`;
             }
 
             function renamePresetFromPanel(index) {
-                const savedPresets = JSON.parse(localStorage.getItem('logPresets') || '[]');
+                const savedPresets = readJsonArray('logPresets');
                 const preset = savedPresets[index];
                 if (!preset) return;
                 const newName = prompt('새 프리셋 이름을 입력하세요:', preset.name);
