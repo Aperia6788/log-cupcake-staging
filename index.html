@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🧁 Log Cupcake</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&amp;family=Noto+Serif+KR:wght@400;600;700&amp;display=swap"
         rel="stylesheet">
     <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
     <style>
@@ -1373,6 +1373,60 @@
         }
 
         /* ========== 말풍선 추가 스타일 ========== */
+        .presentation-settings select,
+        .presentation-settings input[type="url"] {
+            width: 100%;
+            padding: 10px;
+            background: var(--panel-bg);
+            border: 1px solid var(--input-border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font: inherit;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .presentation-hint {
+            margin: 8px 0 12px;
+            font-size: 12px;
+            line-height: 1.7;
+            color: var(--text-secondary);
+        }
+
+        .log-cover { margin: 0 0 24px; }
+        .log-cover img {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        #log-preview.display-simple .simple-line {
+            margin: 12px 0;
+            padding: 0;
+            text-align: left;
+            overflow-wrap: anywhere;
+        }
+
+        .simple-speaker {
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .simple-thought, .simple-whisper { font-style: italic; }
+        .simple-shout { font-weight: 700; }
+
+        #log-preview.display-simple .narration {
+            text-align: left;
+            margin: 16px 0;
+            padding: 0;
+        }
+
+        #log-preview.display-simple .narration::before,
+        #log-preview.display-simple .narration::after { display: none; }
+
         .bubble.whisper {
             background: rgba(0, 0, 0, 0.05) !important;
             color: var(--log-text) !important;
@@ -2881,6 +2935,58 @@ USER: "반가워요."
 
                 <!-- 테마 탭 -->
                 <div id="tab-theme" class="tab-content">
+                    <div class="section presentation-settings">
+                        <div class="section-title">로그 표시 방식</div>
+                        <div class="input-group">
+                            <label class="input-label" for="display-mode">표시 모드</label>
+                            <select id="display-mode">
+                                <option value="default">기본 모드 · 말풍선</option>
+                                <option value="simple">심플 모드 · 대사 색으로 읽기</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label" for="style-font-family">로그 글꼴 · 두 모드 공통</label>
+                            <select id="style-font-family">
+                                <option value="default">기본 · Noto Sans KR</option>
+                                <option value="sans">기기 기본 고딕</option>
+                                <option value="serif">명조 · Noto Serif KR</option>
+                            </select>
+                            <p class="presentation-hint">이미지 저장에는 선택한 글꼴이 그대로 담깁니다. HTML 붙여넣기는 게시글에서 지원하는 글꼴 또는 기기의 대체 글꼴로 표시됩니다.</p>
+                        </div>
+                        <div id="simple-mode-options" hidden>
+                            <div class="input-row">
+                                <div class="input-group">
+                                    <label class="input-label" for="simple-color-ai">심플 AI 대사 색</label>
+                                    <input type="color" id="simple-color-ai" value="#274b75">
+                                </div>
+                                <div class="input-group">
+                                    <label class="input-label" for="simple-color-user">심플 USER 대사 색</label>
+                                    <input type="color" id="simple-color-user" value="#993851">
+                                </div>
+                            </div>
+                            <p class="presentation-hint">말풍선 없이 본문을 이어 읽습니다. 추가 캐릭터는 이름 색을 사용하고, 생각·통신 색은 기존 설정을 따릅니다.</p>
+                        </div>
+                        <div class="input-group">
+                            <label class="input-label" for="profile-layout">상단 이미지 구성 · 두 모드 공통</label>
+                            <select id="profile-layout">
+                                <option value="split">2분할 프로필</option>
+                                <option value="cover">단일 표지 이미지</option>
+                            </select>
+                        </div>
+                        <div id="cover-image-options" hidden>
+                            <div class="input-group">
+                                <label class="input-label" for="cover-image-upload">표지 이미지 업로드</label>
+                                <input type="file" id="cover-image-upload" accept="image/*">
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label" for="cover-image-url">또는 이미지 주소</label>
+                                <input type="url" id="cover-image-url" placeholder="https://…">
+                            </div>
+                            <p id="cover-image-status" class="presentation-hint" role="status"></p>
+                            <button type="button" id="cover-image-remove" class="btn btn-secondary">표지 이미지 제거</button>
+                            <p class="presentation-hint">원본 비율로 표시합니다. 2분할로 돌아가면 기존 프로필 사진과 소개가 다시 나타납니다.</p>
+                        </div>
+                    </div>
                     <div class="section">
                         <div class="section-title">프리셋 테마</div>
                         <div class="theme-grid">
@@ -3244,12 +3350,17 @@ USER: "반가워요."
             // Returns whether the value is now stored. Callers must check before announcing
             // success: a quota failure used to alert the user and then let the caller alert
             // '프리셋이 저장되었습니다!' immediately afterwards, with nothing written.
-            function safeSetItem(key, value) {
+            function safeSetItem(key, value, { evictCaches = true } = {}) {
                 try {
                     localStorage.setItem(key, value);
                     return true;
                 } catch(e) {
                     if (e.name === 'QuotaExceededError' || e.code === 22) {
+                        // New optional reading preferences must never evict the user's existing avatars.
+                        if (!evictCaches) {
+                            notify('⚠️ 저장 공간이 부족해 표시 설정을 저장하지 못했습니다. 기존 데이터는 유지됩니다.');
+                            return false;
+                        }
                         // Free the disposable caches and retry once.
                         for (const cacheKey of DISPOSABLE_CACHE_KEYS) {
                             try {
@@ -5829,6 +5940,179 @@ USER: "반가워요."
         }));
     }
 
+    // Stable IDs are persisted, never arbitrary CSS. Both renderers resolve the same catalogue.
+    const FONT_FAMILIES = Object.freeze({
+        default: "'Noto Sans KR',sans-serif",
+        sans: "system-ui,-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif",
+        serif: "'Noto Serif KR','Batang','AppleMyungjo',serif"
+    });
+
+    const DEFAULT_PRESENTATION = Object.freeze({
+        mode: 'default', fontFamily: 'default', profileLayout: 'split',
+        coverImageData: '', coverImageUrl: '', aiColor: '#274b75', userColor: '#993851'
+    });
+
+    function colorOr(value, fallback) {
+        return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
+    }
+
+    function normalizePresentation(value) {
+        const source = value && typeof value === 'object' ? value : {};
+        return {
+            mode: source.mode === 'simple' ? 'simple' : 'default',
+            fontFamily: Object.hasOwn(FONT_FAMILIES, source.fontFamily) ? source.fontFamily : 'default',
+            profileLayout: source.profileLayout === 'cover' ? 'cover' : 'split',
+            coverImageData: typeof source.coverImageData === 'string' && source.coverImageData.startsWith('data:image/') ? source.coverImageData : '',
+            coverImageUrl: typeof source.coverImageUrl === 'string' ? source.coverImageUrl.trim() : '',
+            aiColor: colorOr(source.aiColor, DEFAULT_PRESENTATION.aiColor),
+            userColor: colorOr(source.userColor, DEFAULT_PRESENTATION.userColor)
+        };
+    }
+
+    function getCoverSource(presentation) {
+        return presentation.profileLayout === 'cover'
+            ? presentation.coverImageUrl || presentation.coverImageData : '';
+    }
+
+    // This is a semantic reading model, not either output dialect's HTML/CSS.
+    function createSimpleLineModel(speaker, { ai, user, characters, textColor }) {
+        const character = speaker.kind === 'character' ? characters[speaker.index] : null;
+        const identity = speaker.kind === 'character'
+            ? character ? { name: character.name, color: character.nameColor,
+                thoughtColor: character.nameColor, commColor: character.commColor || ai.commColor }
+                : { ...ai, name: '' }
+            : speaker.speaker === 'USER' ? user : ai;
+        const bubble = classifyBubbleContent(speaker.content);
+        let content = bubble.content;
+        let color = identity.color;
+        if (bubble.kind === 'dialogue') content = `“${content}”`;
+        if (bubble.kind === 'thought') {
+            content = `‘${content}’`;
+            color = identity.thoughtColor;
+        }
+        if (bubble.kind === 'communication') {
+            content = `📡 ${content}`;
+            color = identity.commColor;
+        }
+        if (bubble.kind === 'plain') color = textColor;
+        return {
+            name: identity.name, content, color: colorOr(color, textColor), kind: bubble.kind,
+            italic: bubble.kind === 'thought' || bubble.kind === 'whisper',
+            bold: bubble.kind === 'shout',
+            missingCharacter: speaker.kind === 'character' && !character ? speaker.index + 1 : null
+        };
+    }
+
+    const PRESENTATION_STORAGE_KEY = 'logPresentation';
+    const CONTROL_IDS = Object.freeze({
+        mode: 'display-mode', fontFamily: 'style-font-family', profileLayout: 'profile-layout',
+        coverImageUrl: 'cover-image-url', aiColor: 'simple-color-ai', userColor: 'simple-color-user'
+    });
+    let coverImageData = '';
+    let coverReadGeneration = 0;
+
+    function collectPresentation() {
+        const values = { coverImageData };
+        for (const [key, id] of Object.entries(CONTROL_IDS)) values[key] = document.getElementById(id)?.value;
+        return normalizePresentation(values);
+    }
+
+    function persistPresentation() {
+        // Use the existing checked storage boundary; this separate last-used value never rewrites a preset.
+        safeSetItem(PRESENTATION_STORAGE_KEY, JSON.stringify([collectPresentation()]), { evictCaches: false });
+    }
+
+    function updatePresentationView() {
+        const settings = collectPresentation();
+        const preview = document.getElementById('log-preview');
+        preview.classList.toggle('display-simple', settings.mode === 'simple');
+        preview.style.fontFamily = FONT_FAMILIES[settings.fontFamily];
+        const simpleOptions = document.getElementById('simple-mode-options');
+        if (simpleOptions) simpleOptions.hidden = settings.mode !== 'simple';
+        const coverOptions = document.getElementById('cover-image-options');
+        if (coverOptions) coverOptions.hidden = settings.profileLayout !== 'cover';
+        const status = document.getElementById('cover-image-status');
+        if (status) status.textContent = settings.coverImageUrl ? '이미지 주소 사용 중' : coverImageData ? '업로드한 이미지 사용 중' : '표지 이미지를 선택해 주세요.';
+    }
+
+    function applyPresentation(value, { persist = true } = {}) {
+        // Invalidates in-flight uploads on preset changes and reset, so a late FileReader cannot resurrect old data.
+        coverReadGeneration++;
+        const settings = normalizePresentation(value);
+        coverImageData = settings.coverImageData;
+        for (const [key, id] of Object.entries(CONTROL_IDS)) {
+            const element = document.getElementById(id);
+            if (element) element.value = settings[key];
+        }
+        const fileInput = document.getElementById('cover-image-upload');
+        if (fileInput) fileInput.value = '';
+        updatePresentationView();
+        if (persist) persistPresentation();
+    }
+
+    function changed() {
+        updatePresentationView();
+        persistPresentation();
+        requestLogRender();
+    }
+
+    function uploadCover(event) {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const generation = ++coverReadGeneration;
+        if (!file.type.startsWith('image/')) {
+            alert('이미지 파일을 선택해 주세요.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (generation !== coverReadGeneration) return;
+            // Preserve the original ratio and bytes, including transparency/animation. No square avatar crop.
+            coverImageData = String(reader.result);
+            document.getElementById('cover-image-url').value = '';
+            changed();
+        };
+        reader.onerror = () => {
+            if (generation === coverReadGeneration) alert('표지 이미지를 읽지 못했습니다. 다른 파일을 선택해 주세요.');
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function initializePresentation() {
+        const saved = readJsonArray(PRESENTATION_STORAGE_KEY)[0];
+        if (saved) applyPresentation(saved, { persist: false });
+        else updatePresentationView();
+        for (const [key, id] of Object.entries(CONTROL_IDS)) {
+            const element = document.getElementById(id);
+            element?.addEventListener(key.endsWith('Color') || key === 'coverImageUrl' ? 'input' : 'change', () => {
+                if (key === 'coverImageUrl') {
+                    coverReadGeneration++;
+                    coverImageData = '';
+                }
+                changed();
+            });
+        }
+        document.getElementById('cover-image-upload')?.addEventListener('change', uploadCover);
+        document.getElementById('cover-image-remove')?.addEventListener('click', () => {
+            applyPresentation({ ...collectPresentation(), coverImageData: '', coverImageUrl: '' });
+            requestLogRender();
+        });
+        requestLogRender();
+    }
+
+    function getSimpleLineModel(speaker, settings) {
+        const value = id => document.getElementById(id)?.value;
+        return createSimpleLineModel(speaker, {
+            ai: { name: value('name-ai') || 'AI', color: settings.aiColor,
+                thoughtColor: value('color-thought-ai') || value('color-thought'),
+                commColor: value('color-comm-ai') || value('color-comm') },
+            user: { name: value('name-user') || 'USER', color: settings.userColor,
+                thoughtColor: value('color-thought-user') || value('color-thought'),
+                commColor: value('color-comm-user') || value('color-comm') },
+            characters: getExtraCharacters(), textColor: value('color-text') || '#1d2129'
+        });
+    }
+
     function createProfileCardModel({
         botAvatar,
         botBio,
@@ -6047,6 +6331,8 @@ USER: "반가워요."
 
             // ========== Log parsing and generation ==========
             function generateLog() {
+                const presentation = collectPresentation();
+                updatePresentationView();
                 // Get current frame type
                 const currentFrameType = document.getElementById('frame-select').value;
 
@@ -6074,6 +6360,8 @@ USER: "반가워요."
                 const preview = document.getElementById('log-preview');
                 const unconfiguredCharacterNumbers = new Set();
                 let html = '';
+                const coverSource = getCoverSource(presentation);
+                if (coverSource) html += `<div class="log-cover"><img src="${escapeHtmlAttribute(coverSource)}" alt="표지 이미지"></div>`;
 
                 // Get the character name (define it first as it will be used in the title)
                 const aiName = document.getElementById('name-ai').value || 'AI';
@@ -6136,7 +6424,7 @@ USER: "반가워요."
                 }
 
                 // Bot/Persona Profile Card (Below subheading, placed left and right)
-                if (profileCardModel.showPrimaryCards) {
+                if (presentation.profileLayout === 'split' && profileCardModel.showPrimaryCards) {
                     const botAvatarClass = profileCardModel.bot.isCircle ? 'persona-avatar circle' : 'persona-avatar';
                     const personaAvatarClass = profileCardModel.persona.isCircle ? 'persona-avatar circle' : 'persona-avatar';
                     html += '<div class="persona-intro" style="flex-direction:row;justify-content:center;gap:32px;flex-wrap:nowrap;">';
@@ -6169,7 +6457,7 @@ USER: "반가워요."
 
                 // Additional character profile cards (under Bots/Personas)
                 const extraCharsWithProfile = profileCardModel.extraCharacters;
-                if (extraCharsWithProfile.length > 0) {
+                if (presentation.profileLayout === 'split' && extraCharsWithProfile.length > 0) {
                     html += '<div class="persona-intro" style="flex-direction:row;justify-content:center;gap:24px;flex-wrap:wrap;">';
                     extraCharsWithProfile.forEach(profile => {
                         const char = profile.character;
@@ -6308,6 +6596,16 @@ USER: "반가워요."
 
                     lines.forEach((line, lineIndex) => {
                         const lineDecision = classifyLogLine(line);
+
+                        if (presentation.mode === 'simple' && lineDecision.kind === 'speaker') {
+                            const model = getSimpleLineModel(lineDecision.speaker, presentation);
+                            if (model.missingCharacter) unconfiguredCharacterNumbers.add(model.missingCharacter);
+                            lastWasNarration = false;
+                            html += `<div class="simple-line simple-${model.kind}" style="color:${model.color};">`;
+                            if (model.name) html += `<span class="simple-speaker">${escapeHtml(model.name)}</span>`;
+                            html += `${processMarkdown(model.content)}</div>`;
+                            return;
+                        }
 
                         // Blank line handling
                         if (lineDecision.kind === 'blank') {
@@ -6480,7 +6778,9 @@ USER: "반가워요."
 
 
             // ========== Save Image ==========
-            function saveImage() {
+            async function saveImage() {
+                // A newly selected web font may still be loading when Save is clicked.
+                await document.fonts.ready;
                 const preview = document.getElementById('log-preview');
                 document.querySelector('.preview-wrapper');
                 const frameType = document.getElementById('frame-select').value;
@@ -6666,6 +6966,7 @@ USER: "반가워요."
                 });
 
                 return {
+                    presentation: collectPresentation(),
                     colors: {
                         bg: document.getElementById('bg-solid-color').value,
                         text: document.getElementById('color-text').value,
@@ -6745,7 +7046,8 @@ USER: "반가워요."
             `).join('');
             }
 
-            function applyPresetData(preset) {
+            function applyPresetData(preset, { persistPresentation = true } = {}) {
+                applyPresentation(preset.presentation, { persist: persistPresentation });
                 // Apply background color
                 if (preset.colors) {
                     if (preset.colors.bg) {
@@ -7031,6 +7333,7 @@ USER: "반가워요."
             // ========== Initialization function ==========
             function resetAll() {
                 if (!confirm('모든 입력값을 초기화하시겠습니까?')) return;
+                applyPresentation();
 
                 // Reset title
                 document.getElementById('log-title').value = '';
@@ -7171,6 +7474,8 @@ USER: "반가워요."
             }
 
             function generateArcaHTML() {
+                const presentation = collectPresentation();
+                const simple = presentation.mode === 'simple';
                 // Get Color
                 const bgColor = document.getElementById('bg-solid-color').value;
                 const bgType = document.getElementById('bg-type').value;
@@ -7291,7 +7596,9 @@ USER: "반가워요."
                 html += `<div style="text-align:center;">`;
 
                 // Start outer container (80% width, center aligned)
-                html += `<div style="${bgStyle}${frameCSS}padding:24px;border-radius:${borderRadius}px;font-family:'Noto Sans KR',sans-serif;font-size:${fontSize}px;line-height:1.7;color:${textColor} !important;width:${arcaWidth}%;max-width:100%;margin:0 auto;text-align:left;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;">`;
+                html += `<div style="${bgStyle}${frameCSS}padding:24px;border-radius:${borderRadius}px;font-family:${FONT_FAMILIES[presentation.fontFamily]};font-size:${fontSize}px;line-height:${document.getElementById('style-line-height').value || '1.7'};color:${textColor} !important;width:${arcaWidth}%;max-width:100%;margin:0 auto;text-align:left;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;">`;
+                const coverSource = getCoverSource(presentation);
+                if (coverSource) html += `<div style="margin:0 0 24px;text-align:center;"><img src="${escapeHtmlAttribute(coverSource)}" alt="표지 이미지" style="display:block;width:100%;max-width:100%;height:auto;border-radius:8px;margin:0 auto;"></div>`;
 
                 // title
                 if (title || subtitle || aiModel || promptName || translation || characterLinkModel.hasLinks) {
@@ -7311,7 +7618,7 @@ USER: "반가워요."
                     html += `</div>`;
                 }
 
-                if (profileCardModel.showPrimaryCards) {
+                if (presentation.profileLayout === 'split' && profileCardModel.showPrimaryCards) {
                     const botAvatarRadius = profileCardModel.bot.isCircle ? '999px' : '20px';
                     const personaAvatarRadius = profileCardModel.persona.isCircle ? '999px' : '20px';
                     html += `<div style="text-align:center;margin-bottom:24px;padding:20px;border-radius:18px;background:rgba(128,128,128,0.08);">`;
@@ -7344,7 +7651,7 @@ USER: "반가워요."
 
                 // Additional character profile cards (under Bots/Personas)
                 const extraCharsWithProfile = profileCardModel.extraCharacters;
-                if (extraCharsWithProfile.length > 0) {
+                if (presentation.profileLayout === 'split' && extraCharsWithProfile.length > 0) {
                     html += `<div style="text-align:center;margin-bottom:24px;padding:20px;border-radius:18px;background:rgba(128,128,128,0.08);">`;
                     html += `<table style="margin:0 auto;border-collapse:collapse;border:none;border-spacing:0;max-width:100%;width:100%;" border="0" cellspacing="0" cellpadding="0">`;
                     extraCharsWithProfile.forEach((profile, index) => {
@@ -7416,6 +7723,11 @@ USER: "반가워요."
 
                     function flushNarrationArca() {
                         if (narrationBuffer.length > 0) {
+                            if (simple) {
+                                html += `<div style="text-align:left;color:${textColor} !important;padding:0;margin:16px 0;${narrationStyle}">${narrationBuffer.join('<br>')}</div>`;
+                                narrationBuffer = [];
+                                return;
+                            }
                             // Narration + short lines up and down into one div (text-based lines)
                             html += `<div style="text-align:center;color:${textColor} !important;padding:8px 16px;margin:10px 0;box-sizing:border-box;${narrationStyle}">`;
                             html += `<span style="color:rgba(128,128,128,0.5) !important;">──────</span><br>`;
@@ -7463,6 +7775,17 @@ USER: "반가워요."
 
                     lines.forEach((line, lineIndex) => {
                         const lineDecision = classifyLogLine(line);
+
+                        if (simple && lineDecision.kind === 'speaker') {
+                            flushNarrationArca();
+                            const model = getSimpleLineModel(lineDecision.speaker, presentation);
+                            lastWasNarrationArca = false;
+                            const emphasis = `${model.italic ? 'font-style:italic;' : ''}${model.bold ? 'font-weight:700;' : ''}`;
+                            html += `<div style="margin:12px 0;padding:0;text-align:left;color:${model.color} !important;${emphasis}">`;
+                            if (model.name) html += `<span style="font-size:0.75em;font-weight:600;margin-right:10px;">${escapeHtml(model.name)}</span>`;
+                            html += `${processMarkdownArca(model.content)}</div>`;
+                            return;
+                        }
 
                         // Blank line handling
                         if (lineDecision.kind === 'blank') {
@@ -7827,9 +8150,12 @@ AI: 빙그레 웃는다`;
                     const savedPresets = readJsonArray('logPresets');
                     const preset = savedPresets[lastPresetIndex];
                     if (preset) {
-                        applyPresetData(preset);
+                        applyPresetData(preset, { persistPresentation: false });
                     }
                 }
+
+                // Last-used reading settings win over the remembered preset at startup only.
+                initializePresentation();
 
                 // Recall saved mode settings
                 const savedMode = localStorage.getItem('logmaker-mode');
