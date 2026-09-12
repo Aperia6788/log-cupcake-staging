@@ -1767,15 +1767,9 @@
                 flex-direction: column;
             }
 
-            .log-block-header {
-                padding: 8px 10px;
-            }
-
-            .log-block-actions button {
-                width: 28px;
-                height: 28px;
-                font-size: 14px;
-            }
+            /* The narrow-screen sizing for .log-block-header / .log-block-actions button used to
+               live here, ahead of those components' own rules, so equal specificity plus source
+               order made it dead code. It now sits directly after the block styles below. */
 
             /* 모바일 뷰 전환 버튼 */
             .mobile-view-toggle {
@@ -2014,6 +2008,10 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            /* The title is the only part allowed to give way here. Without this gap and the
+               flex sizing below, a narrow screen pushes the action buttons past the block's
+               overflow:hidden edge and the rightmost ones (collapse, delete) disappear. */
+            gap: 8px;
             padding: 10px 12px;
             background: var(--input-bg);
             border-bottom: 1px solid var(--input-border);
@@ -2030,6 +2028,10 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            /* min-width:0 overrides the flex default of min-width:auto, which is what
+               otherwise refuses to shrink and forces the overflow onto the action row. */
+            flex: 0 1 auto;
+            min-width: 0;
         }
 
         .log-block-title input {
@@ -2037,7 +2039,10 @@
             border: none;
             color: var(--text-primary);
             font-size: 13px;
-            width: 150px;
+            /* 150px as a shrinkable basis, not a hard width: same size as before wherever
+               there is room, and it narrows instead of clipping the buttons when there is not. */
+            flex: 0 1 150px;
+            min-width: 0;
             padding: 4px;
         }
 
@@ -2050,11 +2055,14 @@
         .log-block-actions {
             display: flex;
             gap: 4px;
+            /* Never the element that shrinks: delete/collapse must stay reachable at any width. */
+            flex: 0 0 auto;
         }
 
         .log-block-actions button {
             width: 30px;
             height: 30px;
+            flex: 0 0 auto;
             border: none;
             border-radius: 6px;
             cursor: pointer;
@@ -2097,6 +2105,24 @@
 
         .log-block textarea {
             min-height: 100px;
+        }
+
+        /* Narrow-screen block header. Must stay AFTER the base rules above: the selectors have
+           identical specificity, so whichever is written last wins regardless of the media query. */
+        @media (max-width: 768px) {
+            .log-block-header {
+                padding: 8px 10px;
+            }
+
+            .log-block-actions button {
+                width: 28px;
+                height: 28px;
+                font-size: 14px;
+            }
+
+            .log-block-actions .btn-delete {
+                font-size: 16px;
+            }
         }
 
         .btn-add-block {
