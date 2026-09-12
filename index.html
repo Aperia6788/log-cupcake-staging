@@ -3299,6 +3299,9 @@ USER: "반가워요."
             // what a quota retry sacrifices. Named here because the retry path and the reset
             // path must agree on exactly which keys are disposable.
             const DISPOSABLE_CACHE_KEYS = Object.freeze(['cachedBotAvatar', 'cachedPersonaAvatar']);
+            // These writes may contain an original-size cover. A failed attempt must not sacrifice
+            // avatars from the current unsaved work merely to try storing another large image.
+            const PRESERVE_EXISTING_DATA_KEYS = new Set(['logPresets', 'logPresentation']);
 
             // Remembers the broken value already reported for each key. Startup and every
             // later list operation repeat the same parse, and the user needs to hear about it
@@ -3350,28 +3353,27 @@ USER: "반가워요."
             // Returns whether the value is now stored. Callers must check before announcing
             // success: a quota failure used to alert the user and then let the caller alert
             // '프리셋이 저장되었습니다!' immediately afterwards, with nothing written.
-            function safeSetItem(key, value, { evictCaches = true } = {}) {
+            function safeSetItem(key, value, { evictCaches = !PRESERVE_EXISTING_DATA_KEYS.has(key) } = {}) {
                 try {
                     localStorage.setItem(key, value);
                     return true;
                 } catch(e) {
                     if (e.name === 'QuotaExceededError' || e.code === 22) {
-                        // New optional reading preferences must never evict the user's existing avatars.
-                        if (!evictCaches) {
-                            notify('⚠️ 저장 공간이 부족해 표시 설정을 저장하지 못했습니다. 기존 데이터는 유지됩니다.');
-                            return false;
-                        }
-                        // Free the disposable caches and retry once.
-                        for (const cacheKey of DISPOSABLE_CACHE_KEYS) {
-                            try {
-                                localStorage.removeItem(cacheKey);
-                            } catch(ignored) {}
+                        // Preserve the single retry (another tab may have freed storage), but large
+                        // preset/presentation writes must never evict existing unsaved avatar data.
+                        if (evictCaches) {
+                            for (const cacheKey of DISPOSABLE_CACHE_KEYS) {
+                                try {
+                                    localStorage.removeItem(cacheKey);
+                                } catch(ignored) {}
+                            }
                         }
                         try {
                             localStorage.setItem(key, value);
                             return true;
                         } catch(retryError) {
-                            notify('⚠️ 저장 공간이 부족합니다. 불필요한 프리셋을 삭제해 주세요.');
+                            notify(evictCaches ? '⚠️ 저장 공간이 부족합니다. 불필요한 프리셋을 삭제해 주세요.'
+                                : '⚠️ 저장 공간이 부족해 저장하지 못했습니다. 기존 데이터는 유지됩니다.');
                             return false;
                         }
                     }
