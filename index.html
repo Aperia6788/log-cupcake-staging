@@ -1409,12 +1409,6 @@
             overflow-wrap: anywhere;
         }
 
-        .simple-speaker {
-            font-size: 0.75em;
-            font-weight: 600;
-            margin-right: 10px;
-        }
-
         .simple-thought, .simple-whisper { font-style: italic; }
         .simple-shout { font-weight: 700; }
 
@@ -2602,8 +2596,8 @@
         <div class="header-divider"></div>
         <div class="header-right">
             <button class="btn btn-secondary preview-toggle" onclick="togglePreviewMode()">📄 미리보기</button>
-            <button class="btn btn-primary" onclick="copyStyled()" title="스타일 복사 - 바로 붙여넣기 가능!">✨ 복사</button>
-            <button class="btn btn-secondary" onclick="copyArcaHTML()" title="HTML 코드 복사">&lt;/&gt; HTML</button>
+            <button class="btn btn-primary" onclick="copyStyled()" title="아카라이브 일반 편집기에 붙여넣기 · 이미지 자동 업로드 후 저장">✨ 복사</button>
+            <button class="btn btn-secondary" onclick="copyArcaHTML()" title="HTML 코드 복사 · 업로드 이미지가 있으면 ✨ 복사를 사용하세요">&lt;/&gt; HTML</button>
             <button class="btn btn-secondary" onclick="resetAll()" title="모든 입력 초기화">🔄 초기화</button>
         </div>
     </header>
@@ -6604,7 +6598,6 @@ USER: "반가워요."
                             if (model.missingCharacter) unconfiguredCharacterNumbers.add(model.missingCharacter);
                             lastWasNarration = false;
                             html += `<div class="simple-line simple-${model.kind}" style="color:${model.color};">`;
-                            if (model.name) html += `<span class="simple-speaker">${escapeHtml(model.name)}</span>`;
                             html += `${processMarkdown(model.content)}</div>`;
                             return;
                         }
@@ -7423,7 +7416,34 @@ USER: "반가워요."
                 alert('초기화되었습니다!');
             }
 
-    // The single awaited way to put text on the clipboard. Both buttons end here, so a
+    const ARCA_AVATAR_SIZE = 160;
+
+    function renderArcaAvatar(source, radius) {
+        // Arca's paste uploader rewrites the image width to 100%. Keep the intended size
+        // on a parent it does not rewrite, while allowing narrow profile cells to shrink.
+        return `<div style="width:100%;max-width:${ARCA_AVATAR_SIZE}px;margin:0 auto 8px;">` +
+            `<img src="${escapeHtmlAttribute(source)}" width="${ARCA_AVATAR_SIZE}" height="${ARCA_AVATAR_SIZE}" style="width:${ARCA_AVATAR_SIZE}px;height:auto;display:block;margin:0 auto;border-radius:${radius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;box-sizing:border-box;"></div>`;
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            // The single awaited way to put text on the clipboard. Both buttons end here, so a
             // refused permission is one ordinary negative outcome rather than an unhandled
             // promise rejection in two different shapes.
             async function writeClipboardText(text) {
@@ -7457,7 +7477,7 @@ USER: "반가워요."
 
                 // Announced outside the try on purpose. Inside it, a throwing alert would be
                 // caught as a copy failure and trigger a redundant second copy.
-                alert('복사 완료! 🧁\n아카라이브에 바로 붙여넣기 하세요!');
+                alert('복사 완료! 🧁\n아카라이브의 일반 편집기에 Ctrl+V로 붙여넣으세요.\n이미지가 있으면 자동 업로드가 끝나고 모두 표시된 뒤 글을 저장하세요.');
                 return true;
             }
 
@@ -7471,7 +7491,10 @@ USER: "반가워요."
                     return false;
                 }
 
-                alert('아카라이브용 HTML이 복사되었습니다!\n\n붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
+                const imageNotice = /<img\b[^>]*\bsrc="data:image\//i.test(html)
+                    ? '\n\n업로드한 이미지가 포함되어 있어요. HTML 모드로 넣으면 아카라이브 저장 시 이미지가 사라집니다.\n이미지도 올리려면 이 앱의 ✨ 복사 버튼으로 다시 복사한 뒤 일반 편집기에 붙여넣으세요. 자동 업로드가 끝난 뒤 저장하세요.\n✨ 복사를 지원하지 않는 브라우저에서는 다른 브라우저로 복사하거나 아카라이브에서 이미지를 직접 첨부해 주세요.'
+                    : '';
+                alert('아카라이브용 HTML이 복사되었습니다!' + imageNotice + '\n\nHTML 붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
                 return true;
             }
 
@@ -7624,11 +7647,11 @@ USER: "반가워요."
                     const botAvatarRadius = profileCardModel.bot.isCircle ? '999px' : '20px';
                     const personaAvatarRadius = profileCardModel.persona.isCircle ? '999px' : '20px';
                     html += `<div style="text-align:center;margin-bottom:24px;padding:20px;border-radius:18px;background:rgba(128,128,128,0.08);">`;
-                    html += `<table style="margin:0 auto;border-collapse:collapse;border:none;border-spacing:0;max-width:100%;" border="0" cellspacing="0" cellpadding="0"><tr>`;
+                    html += `<table style="margin:0 auto;border-collapse:collapse;border:none;border-spacing:0;max-width:100%;width:100%;" border="0" cellspacing="0" cellpadding="0"><tr>`;
                     if (profileCardModel.bot.show) {
                         html += `<td style="width:50%;text-align:center;vertical-align:top;padding:0 8px 8px 8px;border:none;">`;
                         if (profileCardModel.bot.showAvatar) {
-                            html += `<img src="${escapeHtmlAttribute(botAvatar)}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${botAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
+                            html += renderArcaAvatar(botAvatar, botAvatarRadius);
                         }
                         html += `<div style="font-size:1.05em;font-weight:700;color:${profileNameColor} !important;">${escapeHtml(aiName)}</div>`;
                         if (profileCardModel.bot.showBio) {
@@ -7639,7 +7662,7 @@ USER: "반가워요."
                     if (profileCardModel.persona.show) {
                         html += `<td style="width:50%;text-align:center;vertical-align:top;padding:0 8px 8px 8px;border:none;">`;
                         if (profileCardModel.persona.showAvatar) {
-                            html += `<img src="${escapeHtmlAttribute(personaAvatar)}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${personaAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
+                            html += renderArcaAvatar(personaAvatar, personaAvatarRadius);
                         }
                         html += `<div style="font-size:1.05em;font-weight:700;color:${profileNamePersonaColor} !important;">${escapeHtml(userName)}</div>`;
                         if (profileCardModel.persona.showBio) {
@@ -7662,7 +7685,7 @@ USER: "반가워요."
                         const charAvatarRadius = profile.isCircle ? '999px' : '20px';
                         html += `<td style="width:50%;text-align:center;vertical-align:top;padding:0 8px 8px 8px;border:none;">`;
                         if (profile.showAvatar) {
-                            html += `<img src="${escapeHtmlAttribute(char.avatarData)}" width="160" height="160" style="width:160px;height:160px;margin:0 auto 8px auto;border-radius:${charAvatarRadius};border:2px solid rgba(255,255,255,0.12);box-shadow:0 8px 18px rgba(0,0,0,0.14);max-width:100%;">`;
+                            html += renderArcaAvatar(char.avatarData, charAvatarRadius);
                         }
                         html += `<div style="font-size:1.05em;font-weight:700;color:${char.nameColor} !important;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(char.name)}</div>`;
                         if (profile.showBio) {
@@ -7784,7 +7807,6 @@ USER: "반가워요."
                             lastWasNarrationArca = false;
                             const emphasis = `${model.italic ? 'font-style:italic;' : ''}${model.bold ? 'font-weight:700;' : ''}`;
                             html += `<div style="margin:12px 0;padding:0;text-align:left;color:${model.color} !important;${emphasis}">`;
-                            if (model.name) html += `<span style="font-size:0.75em;font-weight:600;margin-right:10px;">${escapeHtml(model.name)}</span>`;
                             html += `${processMarkdownArca(model.content)}</div>`;
                             return;
                         }
