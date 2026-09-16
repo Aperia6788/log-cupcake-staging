@@ -1421,6 +1421,45 @@
         #log-preview.display-simple .narration::before,
         #log-preview.display-simple .narration::after { display: none; }
 
+        /* Simple-mode dialogue background. The fill colour itself is emitted inline by the
+           renderer because it is per speaker; only the shape lives here. */
+        #log-preview.display-simple .simple-line.simple-bg-block {
+            padding: 10px 14px;
+            border-radius: 8px;
+        }
+
+        /* box-decoration-break keeps a wrapped highlight closed on every visual line instead of
+           stretching one rounded box across the wrap. */
+        #log-preview.display-simple .simple-bg-inline {
+            padding: 2px 6px;
+            border-radius: 4px;
+            -webkit-box-decoration-break: clone;
+            box-decoration-break: clone;
+        }
+
+        /* Block folding renders in the preview as well as the Arca export, so the preview needs
+           real rules; the export carries the equivalent inline because no stylesheet travels
+           with a pasted log. */
+        #log-preview .log-fold {
+            margin: 10px 0;
+        }
+
+        /* Deliberately the browser's own disclosure marker, and deliberately the same declarations
+           the export spells out inline. A custom marker cannot travel with a pasted log — pseudo
+           elements need a stylesheet — so styling one here would make the preview stop matching
+           what the reader sees, which is the whole point of folding the preview. */
+        #log-preview .log-fold-summary {
+            cursor: pointer;
+            padding: 8px 12px;
+            background: rgba(128, 128, 128, 0.1);
+            border-radius: 6px;
+            font-weight: 600;
+        }
+
+        #log-preview .log-fold-body {
+            padding: 10px 0;
+        }
+
         .bubble.whisper {
             background: rgba(0, 0, 0, 0.05) !important;
             color: var(--log-text) !important;
@@ -2727,28 +2766,26 @@
                                     style="width:100%; padding:8px; background:var(--panel-bg); border:1px solid var(--input-border); border-radius:6px; color:var(--text-primary); margin-top:4px; font-size:12px;"
                                     onchange="this.previousElementSibling.value = this.value; generateLog();">
                                     <option value="">-- 모델 선택 --</option>
-                                    <option value="Gemini 2.5 Pro">Gemini 2.5 Pro</option>
-                                    <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
-                                    <option value="Gemini 3 Pro">Gemini 3 Pro</option>
                                     <option value="Gemini 3 Flash">Gemini 3 Flash</option>
                                     <option value="Gemini 3.1 Pro Preview">Gemini 3.1 Pro Preview</option>
-                                    <option value="Gemini 3.1 Flash Lite Preview">Gemini 3.1 Flash Lite Preview</option>
-                                    <option value="Claude Sonnet 4">Claude Sonnet 4</option>
-                                    <option value="Claude Sonnet 4.5">Claude Sonnet 4.5</option>
-                                    <option value="Claude Sonnet 4.6">Claude Sonnet 4.6</option>
-                                    <option value="Claude Haiku 4.5">Claude Haiku 4.5</option>
-                                    <option value="Claude Opus 4.5">Claude Opus 4.5</option>
+                                    <option value="Gemini 3.5 Flash">Gemini 3.5 Flash</option>
+                                    <option value="Gemini 3.6 Flash">Gemini 3.6 Flash</option>
+                                    <option value="Gemini 3.7 Flash">Gemini 3.7 Flash</option>
+                                    <option value="Gemini 3.8 Flash">Gemini 3.8 Flash</option>
                                     <option value="Claude Opus 4.6">Claude Opus 4.6</option>
-                                    <option value="Claude Opus 4.1">Claude Opus 4.1</option>
-                                    <option value="Claude Opus 4">Claude Opus 4</option>
-                                    <option value="GPT-4.1">GPT-4.1</option>
-                                    <option value="GPT-5">GPT-5</option>
-                                    <option value="GPT-5.3-latest">GPT-5.3-latest</option>
-                                    <option value="GPT-5.4">GPT-5.4</option>
-                                    <option value="GPT-5-latest">GPT-5-latest</option>
+                                    <option value="Claude Opus 4.8">Claude Opus 4.8</option>
+                                    <option value="Claude Opus 5">Claude Opus 5</option>
+                                    <option value="Claude Sonnet 5">Claude Sonnet 5</option>
                                     <option value="GPT-5.1">GPT-5.1</option>
-                                    <option value="GPT-5.1-latest">GPT-5.1-latest</option>
+                                    <option value="GPT-5.4">GPT-5.4</option>
+                                    <option value="GPT-5.5">GPT-5.5</option>
+                                    <option value="GPT-5.6-sol">GPT-5.6-sol</option>
+                                    <option value="GPT-6-astra">GPT-6-astra</option>
                                     <option value="DeepSeek">DeepSeek</option>
+                                    <option value="DeepSeek 4 Pro">DeepSeek 4 Pro</option>
+                                    <option value="GLM-5.3">GLM-5.3</option>
+                                    <option value="Kimi K2.7 Code">Kimi K2.7 Code</option>
+                                    <option value="Kimi K3">Kimi K3</option>
                                 </select>
                             </div>
                             <div class="input-group">
@@ -2765,28 +2802,29 @@
                                     style="width:100%; padding:8px; background:var(--panel-bg); border:1px solid var(--input-border); border-radius:6px; color:var(--text-primary); margin-top:4px; font-size:12px;"
                                     onchange="this.previousElementSibling.value = this.value; generateLog();">
                                     <option value="">-- 번역기 선택 --</option>
-                                    <option value="Gemini 2.5 Pro">Gemini 2.5 Pro</option>
-                                    <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
-                                    <option value="Gemini 3 Pro">Gemini 3 Pro</option>
                                     <option value="Gemini 3 Flash">Gemini 3 Flash</option>
                                     <option value="Gemini 3.1 Pro Preview">Gemini 3.1 Pro Preview</option>
-                                    <option value="Gemini 3.1 Flash Lite Preview">Gemini 3.1 Flash Lite Preview</option>
-                                    <option value="Claude Sonnet 4">Claude Sonnet 4</option>
-                                    <option value="Claude Sonnet 4.5">Claude Sonnet 4.5</option>
-                                    <option value="Claude Sonnet 4.6">Claude Sonnet 4.6</option>
-                                    <option value="Claude Haiku 4.5">Claude Haiku 4.5</option>
-                                    <option value="Claude Opus 4.5">Claude Opus 4.5</option>
+                                    <option value="Gemini 3.5 Flash">Gemini 3.5 Flash</option>
+                                    <option value="Gemini 3.6 Flash">Gemini 3.6 Flash</option>
+                                    <option value="Gemini 3.7 Flash">Gemini 3.7 Flash</option>
+                                    <option value="Gemini 3.8 Flash">Gemini 3.8 Flash</option>
                                     <option value="Claude Opus 4.6">Claude Opus 4.6</option>
-                                    <option value="Claude Opus 4.1">Claude Opus 4.1</option>
-                                    <option value="Claude Opus 4">Claude Opus 4</option>
-                                    <option value="GPT-4.1">GPT-4.1</option>
-                                    <option value="GPT-5">GPT-5</option>
-                                    <option value="GPT-5.3-latest">GPT-5.3-latest</option>
-                                    <option value="GPT-5.4">GPT-5.4</option>
-                                    <option value="GPT-5-latest">GPT-5-latest</option>
+                                    <option value="Claude Opus 4.8">Claude Opus 4.8</option>
+                                    <option value="Claude Opus 5">Claude Opus 5</option>
+                                    <option value="Claude Sonnet 5">Claude Sonnet 5</option>
                                     <option value="GPT-5.1">GPT-5.1</option>
-                                    <option value="GPT-5.1-latest">GPT-5.1-latest</option>
+                                    <option value="GPT-5.4">GPT-5.4</option>
+                                    <option value="GPT-5.5">GPT-5.5</option>
+                                    <option value="GPT-5.6-sol">GPT-5.6-sol</option>
+                                    <option value="GPT-6-astra">GPT-6-astra</option>
                                     <option value="DeepSeek">DeepSeek</option>
+                                    <option value="DeepSeek 4 Pro">DeepSeek 4 Pro</option>
+                                    <option value="DeepSeek 4.1 Flash">DeepSeek 4.1 Flash</option>
+                                    <option value="GLM-5.3">GLM-5.3</option>
+                                    <option value="Kimi K2.7 Code">Kimi K2.7 Code</option>
+                                    <option value="Kimi K3">Kimi K3</option>
+                                    <option value="Google Gemma 4 31B">Google Gemma 4 31B</option>
+                                    <option value="Google Gemma 4 26B">Google Gemma 4 26B</option>
                                     <option value="DeepL">DeepL</option>
                                     <option value="Papago">Papago</option>
                                     <option value="Google 번역">Google 번역</option>
@@ -2888,9 +2926,9 @@
                             <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
                                 <input type="checkbox" id="block-folding" checked
                                     style="width:16px; height:16px; cursor:pointer;">
-                                <span>HTML 복사 시 블록 접기</span>
+                                <span>블록 접기</span>
                             </label>
-                            <span style="font-size:11px; color:var(--text-secondary);">(아카라이브용)</span>
+                            <span style="font-size:11px; color:var(--text-secondary);">(미리보기·HTML 공통 · 첫 블록만 펼침)</span>
                             <span style="color:var(--panel-border); margin:0 4px;">|</span>
                             <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
                                 <input type="checkbox" id="narration-italic"
@@ -2967,11 +3005,30 @@ USER: "반가워요."
                         <div class="input-group">
                             <label class="input-label" for="style-font-family">로그 글꼴 · 두 모드 공통</label>
                             <select id="style-font-family">
-                                <option value="default">기본 · Noto Sans KR</option>
-                                <option value="sans">기기 기본 고딕</option>
-                                <option value="serif">명조 · Noto Serif KR</option>
+                                <optgroup label="바로 쓰는 글꼴">
+                                    <option value="default">기본 · Noto Sans KR</option>
+                                    <option value="sans">기기 기본 고딕</option>
+                                    <option value="serif">명조 · Noto Serif KR</option>
+                                </optgroup>
+                                <optgroup label="고딕 · 본문용">
+                                    <option value="pretendard">프리텐다드</option>
+                                    <option value="nanumgothic">나눔고딕</option>
+                                    <option value="gowundodum">고운돋움</option>
+                                </optgroup>
+                                <optgroup label="명조 · 감성">
+                                    <option value="nanummyeongjo">나눔명조</option>
+                                    <option value="gowunbatang">고운바탕</option>
+                                    <option value="songmyung">송명</option>
+                                </optgroup>
+                                <optgroup label="손글씨 · 개성">
+                                    <option value="nanumpen">나눔손글씨 펜</option>
+                                    <option value="nanumbrush">나눔손글씨 붓</option>
+                                    <option value="gaegu">개구쟁이</option>
+                                    <option value="jua">주아</option>
+                                    <option value="dohyeon">도현</option>
+                                </optgroup>
                             </select>
-                            <p class="presentation-hint">이미지 저장에는 선택한 글꼴이 그대로 담깁니다. HTML 붙여넣기는 게시글에서 지원하는 글꼴 또는 기기의 대체 글꼴로 표시됩니다.</p>
+                            <p class="presentation-hint">이미지 저장에는 선택한 글꼴이 그대로 담깁니다. HTML 붙여넣기는 게시글에서 지원하는 글꼴 또는 기기의 대체 글꼴로 표시됩니다. ‘바로 쓰는 글꼴’ 외에는 고른 순간에만 내려받으니 처음 한 번은 잠깐 기본 글꼴로 보일 수 있어요.</p>
                         </div>
                         <div id="simple-mode-options" hidden>
                             <div class="input-row">
@@ -2983,6 +3040,27 @@ USER: "반가워요."
                                     <label class="input-label" for="simple-color-user">심플 USER 대사 색</label>
                                     <input type="color" id="simple-color-user" value="#993851">
                                 </div>
+                            </div>
+                            <div class="input-group">
+                                <label class="input-label" for="simple-bg-mode">대사 배경</label>
+                                <select id="simple-bg-mode">
+                                    <option value="none">없음</option>
+                                    <option value="inline">글자 뒤만 · 형광펜</option>
+                                    <option value="block">줄 전체</option>
+                                </select>
+                            </div>
+                            <div id="simple-bg-colors" hidden>
+                                <div class="input-row">
+                                    <div class="input-group">
+                                        <label class="input-label" for="simple-bg-ai">심플 AI 대사 배경색</label>
+                                        <input type="color" id="simple-bg-ai" value="#e8eef7">
+                                    </div>
+                                    <div class="input-group">
+                                        <label class="input-label" for="simple-bg-user">심플 USER 대사 배경색</label>
+                                        <input type="color" id="simple-bg-user" value="#f7e9ee">
+                                    </div>
+                                </div>
+                                <p class="presentation-hint">추가 캐릭터는 각자의 말풍선 배경색을 그대로 씁니다. 배경은 화자를 따르고 글자색은 대사 종류(대사·생각·통신)를 따릅니다.</p>
                             </div>
                             <p class="presentation-hint">말풍선 없이 본문을 이어 읽습니다. 추가 캐릭터는 이름 색을 사용하고, 생각·통신 색은 기존 설정을 따릅니다.</p>
                         </div>
@@ -3154,7 +3232,9 @@ USER: "반가워요."
                                 style="width:100%; padding:10px; background:var(--panel-bg); border:1px solid var(--input-border); border-radius:8px; color:var(--text-primary);">
                                 <option value="solid">단색</option>
                                 <option value="gradient">그라데이션</option>
+                                <option value="none">없음 · 투명</option>
                             </select>
+                            <p class="presentation-hint" style="margin-top:6px;">‘없음’은 배경판을 아예 그리지 않아 붙여넣은 곳의 밝은/어두운 테마를 그대로 따릅니다. 글자색은 그대로 적용되니 양쪽 테마에서 다 읽히는 색인지 확인해 주세요. 블록 제목도 이때는 본문 글자색을 따라갑니다. 이미지로 저장하면 배경이 투명한 PNG가 됩니다.</p>
                         </div>
                         <div id="bg-solid-options">
                             <div class="input-group">
@@ -3307,6 +3387,99 @@ USER: "반가워요."
         return lum > 0.5 ? '#1d2129' : '#ffffff';
     }
 
+    // One owner for "what colour should a heading be, given the log's background". The rule used to
+    // be written out three times (live preview, Arca export, custom-colour reapply), which is exactly
+    // how adding a third background type produced an invisible heading in two of them.
+    function resolveLogHeadingColor({ backgroundType, solidColor, gradientStartColor, textColor }) {
+        // A transparent log has no colour of its own — it sits on the reader's page, whose colour is
+        // unknowable here. Contrasting against the solid colour nobody paints is guaranteed wrong for
+        // one of the two host themes: a dark pick yields a white heading that vanishes on a white
+        // page. The log's own text colour is the one the user already decided reads there.
+        if (backgroundType === 'none') return textColor;
+        return getContrastColor(backgroundType === 'gradient' ? gradientStartColor : solidColor);
+    }
+
+    function createProfileCardModel({
+        botAvatar,
+        botBio,
+        botAvatarShape,
+        personaAvatar,
+        personaBio,
+        personaAvatarShape,
+        extraCharacters
+    }) {
+        const bot = {
+            show: Boolean(botAvatar || botBio),
+            showAvatar: Boolean(botAvatar),
+            showBio: Boolean(botBio),
+            isCircle: botAvatarShape === 'circle'
+        };
+        const persona = {
+            show: Boolean(personaAvatar || personaBio),
+            showAvatar: Boolean(personaAvatar),
+            showBio: Boolean(personaBio),
+            isCircle: personaAvatarShape === 'circle'
+        };
+
+        return {
+            showPrimaryCards: bot.show || persona.show,
+            bot,
+            persona,
+            extraCharacters: extraCharacters
+                .filter(character => character.avatarData || character.bio)
+                .map(character => ({
+                    character,
+                    showAvatar: Boolean(character.avatarData),
+                    showBio: Boolean(character.bio),
+                    isCircle: character.avatarShape === 'circle'
+                }))
+        };
+    }
+
+    function createBlockLabelModel({
+        title,
+        blockIndex,
+        blockCount,
+        isFolded,
+        customColor,
+        contrastColor
+    }) {
+        return {
+            title: title || `블록 ${blockIndex + 1}`,
+            // A folded block already carries its title in the summary, so the standalone
+            // heading would be a duplicate.
+            showLabel: !isFolded && blockCount > 1,
+            color: customColor || contrastColor,
+            // Folding used to be an Arca-export-only shape, which left the preview showing every
+            // block run together with no heading at all. Both renderers now read the same decision
+            // so the preview matches what the reader actually gets.
+            // Gated on the same "more than one block" rule as showLabel, and for the same reason: a
+            // summary bar IS a heading, and a lone block is the ordinary case, so folding it would
+            // stamp "블록 1" across nearly every log and hide the whole thing behind a pointless click.
+            fold: Boolean(isFolded) && blockCount > 1,
+            // The first block opens so a reader sees content without clicking. It is a plain
+            // <details open>, so it still closes on click like every other block.
+            startOpen: blockIndex === 0
+        };
+    }
+
+    function createCharacterLinkDisplayModel(charLinks, primaryCharacterName) {
+        return {
+            hasLinks: charLinks.length > 0,
+            // `name === null` is the primary marker, per src/js/modules/character-links.js.
+            // Position says nothing: empty rows are filtered out before this point, so a
+            // named additional link can legitimately arrive at index 0.
+            links: charLinks.map(link => {
+                const isPrimary = link.name === null;
+                return {
+                    name: isPrimary ? primaryCharacterName : link.name || '',
+                    url: link.url,
+                    isPrimary
+                };
+            })
+        };
+    }
+
     // This module owns the application's localStorage boundary: shape-guaranteed reads,
     // quota-aware writes, and removal. Every outcome is reported to the caller.
     //
@@ -3439,13 +3612,9 @@ USER: "반가워요."
                 const solidOptions = document.getElementById('bg-solid-options');
                 const gradientOptions = document.getElementById('bg-gradient-options');
 
-                if (this.value === 'solid') {
-                    solidOptions.style.display = 'block';
-                    gradientOptions.style.display = 'none';
-                } else {
-                    solidOptions.style.display = 'none';
-                    gradientOptions.style.display = 'block';
-                }
+                // 'none' has nothing to configure: it deliberately paints no background at all.
+                solidOptions.style.display = this.value === 'solid' ? 'block' : 'none';
+                gradientOptions.style.display = this.value === 'gradient' ? 'block' : 'none';
                 applyBackground();
                 requestLogRender();
             });
@@ -3514,16 +3683,23 @@ USER: "반가워요."
                 const preview = document.getElementById('log-preview');
                 const bgType = document.getElementById('bg-type').value;
 
-                if (bgType === 'solid') {
-                    const color = document.getElementById('bg-solid-color').value;
-                    preview.style.background = color;
-                    preview.style.setProperty('--log-bg', color);
-                } else {
+                if (bgType === 'none') {
+                    // Let whatever sits behind the log show through, so a dark page stays dark
+                    // instead of getting a fixed white plate under the text.
+                    preview.style.background = 'transparent';
+                } else if (bgType === 'gradient') {
                     const start = document.getElementById('gradient-start').value;
                     const end = document.getElementById('gradient-end').value;
                     const angle = document.getElementById('gradient-angle').value;
                     const gradient = `linear-gradient(${angle}deg, ${start} 0%, ${end} 100%)`;
                     preview.style.background = gradient;
+                } else {
+                    // Solid is the documented default, so an unrecognised value lands here rather than
+                    // on a gradient nobody chose — the case where a theme file written by a newer
+                    // build is imported into an older one and the <select> resolves to ''.
+                    const color = document.getElementById('bg-solid-color').value;
+                    preview.style.background = color;
+                    preview.style.setProperty('--log-bg', color);
                 }
             }
 
@@ -4041,6 +4217,15 @@ USER: "반가워요."
                     // Add selected theme classes (including default)
                     preview.classList.add('theme-' + themeName);
 
+                    // A theme class re-arms `#log-preview { background: var(--log-bg) }`, which is the
+                    // point of a theme — but it must not quietly overrule an explicit "no background
+                    // at all". The export emits none, so a painted preview would disagree with the
+                    // post the reader opens. Only 'none' is re-asserted; solid and gradient keep the
+                    // long-standing behaviour of yielding to the theme.
+                    if (document.getElementById('bg-type').value === 'none') {
+                        preview.style.background = 'transparent';
+                    }
+
                     requestLogRender();
                 });
             });
@@ -4194,9 +4379,12 @@ USER: "반가워요."
                 // Update block label contrast color
                 const blockLabels = preview.querySelectorAll('.arca-block-label');
                 const allBlocks = document.querySelectorAll('.log-block');
-                const acBgType = document.getElementById('bg-type').value;
-                const acBgBase = acBgType === 'gradient' ? document.getElementById('gradient-start').value : document.getElementById('bg-solid-color').value;
-                const acAutoContrast = getContrastColor(acBgBase);
+                const acAutoContrast = resolveLogHeadingColor({
+                    backgroundType: document.getElementById('bg-type').value,
+                    solidColor: document.getElementById('bg-solid-color').value,
+                    gradientStartColor: document.getElementById('gradient-start').value,
+                    textColor: document.getElementById('color-text').value
+                });
                 blockLabels.forEach((el, i) => {
                     const customColor = allBlocks[i] ? allBlocks[i].dataset.blockColor : '';
                     el.style.setProperty('color', customColor || acAutoContrast, 'important');
@@ -5963,15 +6151,59 @@ USER: "반가워요."
     }
 
     // Stable IDs are persisted, never arbitrary CSS. Both renderers resolve the same catalogue.
+    // Never rename or drop an ID: a saved preset stores the ID, not the family string.
     const FONT_FAMILIES = Object.freeze({
         default: "'Noto Sans KR',sans-serif",
         sans: "system-ui,-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif",
-        serif: "'Noto Serif KR','Batang','AppleMyungjo',serif"
+        serif: "'Noto Serif KR','Batang','AppleMyungjo',serif",
+        pretendard: "'Pretendard Variable','Pretendard','Noto Sans KR',sans-serif",
+        nanumgothic: "'Nanum Gothic','Noto Sans KR',sans-serif",
+        nanummyeongjo: "'Nanum Myeongjo','Noto Serif KR',serif",
+        gowundodum: "'Gowun Dodum','Noto Sans KR',sans-serif",
+        gowunbatang: "'Gowun Batang','Noto Serif KR',serif",
+        nanumpen: "'Nanum Pen Script','Noto Sans KR',cursive",
+        nanumbrush: "'Nanum Brush Script','Noto Sans KR',cursive",
+        gaegu: "'Gaegu','Noto Sans KR',cursive",
+        jua: "'Jua','Noto Sans KR',sans-serif",
+        dohyeon: "'Do Hyeon','Noto Sans KR',sans-serif",
+        songmyung: "'Song Myung','Noto Serif KR',serif"
     });
+
+    // Only `default`/`sans`/`serif` are paid for on every page load: `sans` is the device font and the
+    // two Noto families ship in the page head. Putting the other eleven there too measured +193 KB of
+    // compressed font CSS per visit (162 KB → 355 KB, 2026-09-17) for families most readers never
+    // select, so each one names the stylesheet that must arrive BEFORE it can paint and the app layer
+    // fetches it on first use. DOM-free on purpose: the core decides what is needed, not how to load it.
+    const FONT_STYLESHEETS = Object.freeze({
+        pretendard: 'https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css',
+        nanumgothic: 'https://fonts.googleapis.com/css2?family=Nanum+Gothic:wght@400;700&display=swap',
+        nanummyeongjo: 'https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700&display=swap',
+        gowundodum: 'https://fonts.googleapis.com/css2?family=Gowun+Dodum&display=swap',
+        gowunbatang: 'https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap',
+        nanumpen: 'https://fonts.googleapis.com/css2?family=Nanum+Pen+Script&display=swap',
+        nanumbrush: 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap',
+        gaegu: 'https://fonts.googleapis.com/css2?family=Gaegu:wght@300;400;700&display=swap',
+        jua: 'https://fonts.googleapis.com/css2?family=Jua&display=swap',
+        dohyeon: 'https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap',
+        songmyung: 'https://fonts.googleapis.com/css2?family=Song+Myung&display=swap'
+    });
+
+    // '' means "already available" — an unknown ID and a head-loaded family answer the same way,
+    // so the caller never has to know which of the two it is holding.
+    function getFontStylesheet(fontFamily) {
+        return Object.hasOwn(FONT_STYLESHEETS, fontFamily) ? FONT_STYLESHEETS[fontFamily] : '';
+    }
+
+    // How a simple-mode line carries its speaker colour behind the text.
+    // 'inline' hugs the glyphs like a highlighter; 'block' paints the whole line band.
+    const SIMPLE_BACKGROUNDS = Object.freeze(['none', 'inline', 'block']);
 
     const DEFAULT_PRESENTATION = Object.freeze({
         mode: 'default', fontFamily: 'default', profileLayout: 'split',
-        coverImageData: '', coverImageUrl: '', aiColor: '#274b75', userColor: '#993851'
+        coverImageData: '', coverImageUrl: '', aiColor: '#274b75', userColor: '#993851',
+        // 'none' keeps every existing log byte-identical; a stored presentation predating this
+        // setting normalizes to it, so nobody's saved preset changes appearance on upgrade.
+        simpleBackground: 'none', aiBgColor: '#e8eef7', userBgColor: '#f7e9ee'
     });
 
     function colorOr(value, fallback) {
@@ -5987,7 +6219,11 @@ USER: "반가워요."
             coverImageData: typeof source.coverImageData === 'string' && source.coverImageData.startsWith('data:image/') ? source.coverImageData : '',
             coverImageUrl: typeof source.coverImageUrl === 'string' ? source.coverImageUrl.trim() : '',
             aiColor: colorOr(source.aiColor, DEFAULT_PRESENTATION.aiColor),
-            userColor: colorOr(source.userColor, DEFAULT_PRESENTATION.userColor)
+            userColor: colorOr(source.userColor, DEFAULT_PRESENTATION.userColor),
+            simpleBackground: SIMPLE_BACKGROUNDS.includes(source.simpleBackground)
+                ? source.simpleBackground : DEFAULT_PRESENTATION.simpleBackground,
+            aiBgColor: colorOr(source.aiBgColor, DEFAULT_PRESENTATION.aiBgColor),
+            userBgColor: colorOr(source.userBgColor, DEFAULT_PRESENTATION.userBgColor)
         };
     }
 
@@ -5997,11 +6233,14 @@ USER: "반가워요."
     }
 
     // This is a semantic reading model, not either output dialect's HTML/CSS.
-    function createSimpleLineModel(speaker, { ai, user, characters, textColor }) {
+    function createSimpleLineModel(speaker, { ai, user, characters, textColor, backgroundMode }) {
         const character = speaker.kind === 'character' ? characters[speaker.index] : null;
         const identity = speaker.kind === 'character'
             ? character ? { name: character.name, color: character.nameColor,
-                thoughtColor: character.nameColor, commColor: character.commColor || ai.commColor }
+                thoughtColor: character.nameColor, commColor: character.commColor || ai.commColor,
+                // An extra character already owns a bubble fill; reusing it keeps one colour per
+                // character instead of asking for a second one that must be kept in sync by hand.
+                background: character.bgColor }
                 : { ...ai, name: '' }
             : speaker.speaker === 'USER' ? user : ai;
         const bubble = classifyBubbleContent(speaker.content);
@@ -6017,10 +6256,17 @@ USER: "반가워요."
             color = identity.commColor;
         }
         if (bubble.kind === 'plain') color = textColor;
+        // Background follows the SPEAKER while the foreground follows the line kind, so a plain or
+        // thought line stays attributable even where its text colour is deliberately neutral.
+        const requested = SIMPLE_BACKGROUNDS.includes(backgroundMode) ? backgroundMode : 'none';
+        const background = requested === 'none' ? '' : colorOr(identity.background, '');
         return {
             name: identity.name, content, color: colorOr(color, textColor), kind: bubble.kind,
             italic: bubble.kind === 'thought' || bubble.kind === 'whisper',
             bold: bubble.kind === 'shout',
+            // Invariant for both renderers: a mode other than 'none' always carries a usable colour,
+            // so neither has to re-derive whether there is anything to paint.
+            backgroundMode: background ? requested : 'none', background,
             missingCharacter: speaker.kind === 'character' && !character ? speaker.index + 1 : null
         };
     }
@@ -6028,10 +6274,44 @@ USER: "반가워요."
     const PRESENTATION_STORAGE_KEY = 'logPresentation';
     const CONTROL_IDS = Object.freeze({
         mode: 'display-mode', fontFamily: 'style-font-family', profileLayout: 'profile-layout',
-        coverImageUrl: 'cover-image-url', aiColor: 'simple-color-ai', userColor: 'simple-color-user'
+        coverImageUrl: 'cover-image-url', aiColor: 'simple-color-ai', userColor: 'simple-color-user',
+        simpleBackground: 'simple-bg-mode', aiBgColor: 'simple-bg-ai', userBgColor: 'simple-bg-user'
     });
     let coverImageData = '';
     let coverReadGeneration = 0;
+    const loadedFontStylesheets = new Set();
+    const fontStylesheetLoads = [];
+    const FONT_STYLESHEET_WAIT_MS = 3000;
+
+    // Optional families are fetched the first time one is actually chosen. Shipping all of them in the
+    // page head measured +193 KB of compressed font CSS on every visit (2026-09-17) for families most
+    // readers never select. Idempotent, and a no-op wherever there is no document head (tests): the
+    // family name still resolves, only the webfont is missing, which is the normal fallback path.
+    function ensureFontStylesheet(fontFamily) {
+        const href = getFontStylesheet(fontFamily);
+        if (!href || loadedFontStylesheets.has(fontFamily)) return;
+        const head = document.head;
+        const link = document.createElement?.('link');
+        if (!head?.appendChild || !link) return;
+        link.rel = 'stylesheet';
+        link.href = href;
+        // `document.fonts.ready` settles immediately while this stylesheet is still unparsed, so the
+        // image capture cannot rely on it alone: a save started right after switching fonts would
+        // rasterise the fallback and break the stated promise that the PNG keeps the chosen font.
+        // Never rejects and never waits forever — a blocked network must not block a save.
+        fontStylesheetLoads.push(new Promise(resolve => {
+            link.addEventListener('load', resolve, { once: true });
+            link.addEventListener('error', resolve, { once: true });
+            setTimeout(resolve, FONT_STYLESHEET_WAIT_MS);
+        }));
+        head.appendChild(link);
+        loadedFontStylesheets.add(fontFamily);
+    }
+
+    // Consumed by the image capture. Resolving is "we stopped waiting", not "the font arrived".
+    function whenFontStylesheetsSettled() {
+        return Promise.all(fontStylesheetLoads);
+    }
 
     function collectPresentation() {
         const values = { coverImageData };
@@ -6048,9 +6328,13 @@ USER: "반가워요."
         const settings = collectPresentation();
         const preview = document.getElementById('log-preview');
         preview.classList.toggle('display-simple', settings.mode === 'simple');
+        ensureFontStylesheet(settings.fontFamily);
         preview.style.fontFamily = FONT_FAMILIES[settings.fontFamily];
         const simpleOptions = document.getElementById('simple-mode-options');
         if (simpleOptions) simpleOptions.hidden = settings.mode !== 'simple';
+        // The two colour pickers only mean something once a background shape is chosen.
+        const simpleBgColors = document.getElementById('simple-bg-colors');
+        if (simpleBgColors) simpleBgColors.hidden = settings.simpleBackground === 'none';
         const coverOptions = document.getElementById('cover-image-options');
         if (coverOptions) coverOptions.hidden = settings.profileLayout !== 'cover';
         const status = document.getElementById('cover-image-status');
@@ -6127,81 +6411,15 @@ USER: "반가워요."
         return createSimpleLineModel(speaker, {
             ai: { name: value('name-ai') || 'AI', color: settings.aiColor,
                 thoughtColor: value('color-thought-ai') || value('color-thought'),
-                commColor: value('color-comm-ai') || value('color-comm') },
+                commColor: value('color-comm-ai') || value('color-comm'),
+                background: settings.aiBgColor },
             user: { name: value('name-user') || 'USER', color: settings.userColor,
                 thoughtColor: value('color-thought-user') || value('color-thought'),
-                commColor: value('color-comm-user') || value('color-comm') },
-            characters: getExtraCharacters(), textColor: value('color-text') || '#1d2129'
+                commColor: value('color-comm-user') || value('color-comm'),
+                background: settings.userBgColor },
+            characters: getExtraCharacters(), textColor: value('color-text') || '#1d2129',
+            backgroundMode: settings.simpleBackground
         });
-    }
-
-    function createProfileCardModel({
-        botAvatar,
-        botBio,
-        botAvatarShape,
-        personaAvatar,
-        personaBio,
-        personaAvatarShape,
-        extraCharacters
-    }) {
-        const bot = {
-            show: Boolean(botAvatar || botBio),
-            showAvatar: Boolean(botAvatar),
-            showBio: Boolean(botBio),
-            isCircle: botAvatarShape === 'circle'
-        };
-        const persona = {
-            show: Boolean(personaAvatar || personaBio),
-            showAvatar: Boolean(personaAvatar),
-            showBio: Boolean(personaBio),
-            isCircle: personaAvatarShape === 'circle'
-        };
-
-        return {
-            showPrimaryCards: bot.show || persona.show,
-            bot,
-            persona,
-            extraCharacters: extraCharacters
-                .filter(character => character.avatarData || character.bio)
-                .map(character => ({
-                    character,
-                    showAvatar: Boolean(character.avatarData),
-                    showBio: Boolean(character.bio),
-                    isCircle: character.avatarShape === 'circle'
-                }))
-        };
-    }
-
-    function createBlockLabelModel({
-        title,
-        blockIndex,
-        blockCount,
-        isFolded,
-        customColor,
-        contrastColor
-    }) {
-        return {
-            title: title || `블록 ${blockIndex + 1}`,
-            showLabel: !isFolded && blockCount > 1,
-            color: customColor || contrastColor
-        };
-    }
-
-    function createCharacterLinkDisplayModel(charLinks, primaryCharacterName) {
-        return {
-            hasLinks: charLinks.length > 0,
-            // `name === null` is the primary marker, per src/js/modules/character-links.js.
-            // Position says nothing: empty rows are filtered out before this point, so a
-            // named additional link can legitimately arrive at index 0.
-            links: charLinks.map(link => {
-                const isPrimary = link.name === null;
-                return {
-                    name: isPrimary ? primaryCharacterName : link.name || '',
-                    url: link.url,
-                    isPrimary
-                };
-            })
-        };
     }
 
     // ========== Added vintage theme speech bubble wave background ==========
@@ -6514,24 +6732,33 @@ USER: "반가워요."
                         html += `<div class="log-image"><img src="${escapeHtmlAttribute(img.data)}" alt="Image"></div>`;
                     });
 
-                    // Separator line between blocks (if not the first block)
-                    if (blockIndex > 0) {
-                        html += '<div class="divider"></div>';
-                    }
-
                     // Display block title (unfold block && 2 or more blocks)
-                    const pvBgType = document.getElementById('bg-type').value;
-                    const pvBgBase = pvBgType === 'gradient' ? document.getElementById('gradient-start').value : document.getElementById('bg-solid-color').value;
                     const blockLabel = createBlockLabelModel({
                         title: blockTitles[blockIndex],
                         blockIndex,
                         blockCount: processedBlocks.length,
                         isFolded: blockFoldingPreview,
                         customColor: blockColors[blockIndex],
-                        contrastColor: getContrastColor(pvBgBase)
+                        contrastColor: resolveLogHeadingColor({
+                            backgroundType: document.getElementById('bg-type').value,
+                            solidColor: document.getElementById('bg-solid-color').value,
+                            gradientStartColor: document.getElementById('gradient-start').value,
+                            textColor: document.getElementById('color-text').value
+                        })
                     });
+
+                    // Separator line between blocks (if not the first block). A folded block is
+                    // already visually separated by its own summary bar.
+                    if (blockIndex > 0 && !blockLabel.fold) {
+                        html += '<div class="divider"></div>';
+                    }
+
                     if (blockLabel.showLabel) {
                         html += `<div class="arca-block-label" style="color:${blockLabel.color} !important">${escapeHtml(blockLabel.title)}</div>`;
+                    }
+
+                    if (blockLabel.fold) {
+                        html += `<details class="log-fold"${blockLabel.startOpen ? ' open' : ''}><summary class="log-fold-summary" style="color:${blockLabel.color};">${escapeHtml(blockLabel.title)}</summary><div class="log-fold-body">`;
                     }
 
                     const lines = blockText.split('\n');
@@ -6623,8 +6850,15 @@ USER: "반가워요."
                             const model = getSimpleLineModel(lineDecision.speaker, presentation);
                             if (model.missingCharacter) unconfiguredCharacterNumbers.add(model.missingCharacter);
                             lastWasNarration = false;
-                            html += `<div class="simple-line simple-${model.kind}" style="color:${model.color};">`;
-                            html += `${processMarkdown(model.content)}</div>`;
+                            // 'block' paints the line band; 'inline' needs its own box so the fill
+                            // hugs the glyphs instead of the full column. The core already guaranteed
+                            // a usable colour for anything other than 'none'.
+                            const banded = model.backgroundMode === 'block';
+                            html += `<div class="simple-line simple-${model.kind}${banded ? ' simple-bg-block' : ''}" style="color:${model.color};${banded ? `background:${model.background};` : ''}">`;
+                            html += model.backgroundMode === 'inline'
+                                ? `<span class="simple-bg-inline" style="background:${model.background};">${processMarkdown(model.content)}</span>`
+                                : processMarkdown(model.content);
+                            html += '</div>';
                             return;
                         }
 
@@ -6777,6 +7011,10 @@ USER: "반가워요."
                     afterImages.forEach(img => {
                         html += `<div class="log-image"><img src="${escapeHtmlAttribute(img.data)}" alt="Image"></div>`;
                     });
+
+                    if (blockLabel.fold) {
+                        html += '</div></details>';
+                    }
                 });
 
                 // Add watermark
@@ -6800,7 +7038,11 @@ USER: "반가워요."
 
             // ========== Save Image ==========
             async function saveImage() {
-                // A newly selected web font may still be loading when Save is clicked.
+                // A newly selected web font may still be loading when Save is clicked. The optional
+                // families arrive as a stylesheet injected on selection, and `document.fonts.ready`
+                // settles immediately while that stylesheet is still unparsed — so wait for it first,
+                // then for the faces it declares.
+                await whenFontStylesheetsSettled();
                 await document.fonts.ready;
                 const preview = document.getElementById('log-preview');
                 document.querySelector('.preview-wrapper');
@@ -6839,6 +7081,14 @@ USER: "반가워요."
                     backgroundColor: null,
                     logging: false,
                     onclone: function (clonedDoc) {
+                        // A saved image has nothing to click, so a collapsed block would be missing
+                        // from the file entirely. Only the clone is opened; the live preview keeps
+                        // whatever the user had folded.
+                        clonedDoc.querySelectorAll('#log-preview details').forEach(fold => {
+                            fold.open = true;
+                            fold.setAttribute('open', '');
+                        });
+
                         // Copy SVG filter elements from cloned document
                         const originalSvg = document.querySelector('svg[style*="position:absolute"]');
                         if (originalSvg) {
@@ -7580,6 +7830,11 @@ USER: "반가워요."
                     const angle = document.getElementById('gradient-angle').value;
                     bgStyle = `background:linear-gradient(${angle}deg, ${start} 0%, ${end} 100%) !important;`;
                     bubbleBgColor = start; // Use starting color (so it looks most similar)
+                } else if (bgType === 'none') {
+                    // Declare nothing at all so the host page shows through: a pasted log then follows
+                    // the reader's light/dark theme instead of sitting on a fixed plate. Bubble and
+                    // contrast maths keep using the picked colour, the only stated intent available.
+                    bgStyle = '';
                 }
 
                 // Collect each block and apply regular expressions
@@ -7734,14 +7989,18 @@ USER: "반가워요."
                 blockData.forEach((block, blockIndex) => {
                     const blockNumber = blockIndex + 1;
                     const blockText = block.content;
-                    const contrastBase = bgType === 'gradient' ? bubbleBgColor : bgColor;
                     const blockLabel = createBlockLabelModel({
                         title: block.title,
                         blockIndex,
                         blockCount: blockData.length,
                         isFolded: blockFolding,
                         customColor: block.color,
-                        contrastColor: getContrastColor(contrastBase)
+                        contrastColor: resolveLogHeadingColor({
+                            backgroundType: bgType,
+                            solidColor: bgColor,
+                            gradientStartColor: bubbleBgColor,
+                            textColor
+                        })
                     });
 
                     // Image to insert before this block (position === 'before' only)
@@ -7751,7 +8010,7 @@ USER: "반가워요."
                     });
 
                     // dividing line between blocks
-                    if (blockIndex > 0 && !blockFolding) {
+                    if (blockIndex > 0 && !blockLabel.fold) {
                         html += `<div style="border-top:1px dashed rgba(128,128,128,0.4);margin:20px 0;"></div>`;
                     }
 
@@ -7760,8 +8019,8 @@ USER: "반가워요."
                         html += `<div style="margin:16px 0 12px;padding:10px 20px;border-radius:10px;font-size:1.1em;font-weight:700;background:rgba(128,128,128,0.08);text-align:center;border:1px solid rgba(128,128,128,0.15);"><span style="color:${blockLabel.color}">${escapeHtml(blockLabel.title)}</span></div>`;
                     }
 
-                    if (blockFolding) {
-                        html += `<details style="margin:10px 0;"><summary style="cursor:pointer;padding:8px 12px;background:rgba(128,128,128,0.1);border-radius:6px;font-weight:600;color:${blockLabel.color}"><span style="color:${blockLabel.color}">${escapeHtml(blockLabel.title)}</span></summary><div style="padding:10px 0;">`;
+                    if (blockLabel.fold) {
+                        html += `<details${blockLabel.startOpen ? ' open' : ''} style="margin:10px 0;"><summary style="cursor:pointer;padding:8px 12px;background:rgba(128,128,128,0.1);border-radius:6px;font-weight:600;color:${blockLabel.color}"><span style="color:${blockLabel.color}">${escapeHtml(blockLabel.title)}</span></summary><div style="padding:10px 0;">`;
                     }
 
                     const lines = blockText.split('\n');
@@ -7832,8 +8091,16 @@ USER: "반가워요."
                             const model = getSimpleLineModel(lineDecision.speaker, presentation);
                             lastWasNarrationArca = false;
                             const emphasis = `${model.italic ? 'font-style:italic;' : ''}${model.bold ? 'font-weight:700;' : ''}`;
-                            html += `<div style="margin:12px 0;padding:0;text-align:left;color:${model.color} !important;${emphasis}">`;
-                            html += `${processMarkdownArca(model.content)}</div>`;
+                            // No app stylesheet travels with a pasted log, so the band and the
+                            // highlighter both spell themselves out inline. box-decoration-break keeps
+                            // a wrapped highlight closed on its own line where the reader supports it.
+                            const banded = model.backgroundMode === 'block';
+                            const band = banded ? `background:${model.background} !important;padding:10px 14px;border-radius:8px;` : 'padding:0;';
+                            html += `<div style="margin:12px 0;${band}text-align:left;color:${model.color} !important;${emphasis}">`;
+                            html += model.backgroundMode === 'inline'
+                                ? `<span style="background:${model.background} !important;padding:2px 6px;border-radius:4px;-webkit-box-decoration-break:clone;box-decoration-break:clone;">${processMarkdownArca(model.content)}</span>`
+                                : processMarkdownArca(model.content);
+                            html += '</div>';
                             return;
                         }
 
@@ -8023,7 +8290,7 @@ USER: "반가워요."
                     });
 
                     // Block fold end
-                    if (blockFolding) {
+                    if (blockLabel.fold) {
                         html += `</div></details>`;
                     }
                 });
