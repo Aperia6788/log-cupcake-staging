@@ -2928,7 +2928,13 @@
                                     style="width:16px; height:16px; cursor:pointer;">
                                 <span>블록 접기</span>
                             </label>
-                            <span style="font-size:11px; color:var(--text-secondary);">(미리보기·HTML 공통 · 첫 블록만 펼침)</span>
+                            <!-- The "첫 블록 펼침" convenience is preview-only on purpose: Arca's server
+                                 save strips the `open` attribute, so a reader always lands on fully
+                                 collapsed blocks. Re-emitting `open` cannot beat a server-side strip,
+                                 so the honest fix is telling the author here. Settled by an
+                                 authenticated round trip — .report/arca-details-roundtrip-2026-09-17.md. -->
+                            <span style="font-size:11px; color:var(--text-secondary);"
+                                title="아카라이브는 글을 저장할 때 접기 태그의 open 속성을 제거해요. 접기 자체는 그대로 동작하니, 독자는 블록을 눌러서 펼치게 됩니다.">(미리보기·HTML 공통 · 첫 블록 펼침은 미리보기 전용 — 아카에선 전부 접혀 보여요)</span>
                             <span style="color:var(--panel-border); margin:0 4px;">|</span>
                             <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
                                 <input type="checkbox" id="narration-italic"
