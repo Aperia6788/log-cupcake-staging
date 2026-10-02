@@ -2526,7 +2526,8 @@
 
         .preset-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            /* 230px since v1.3.0: each card also carries the ⠿ 📁 folder tools. */
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
             gap: 8px;
         }
 
@@ -2542,6 +2543,7 @@
 
         .preset-item-name {
             flex: 1;
+            min-width: 0;
             font-size: 13px;
             color: var(--text-primary);
             cursor: pointer;
@@ -2857,10 +2859,260 @@
                 max-height: 70vh;
             }
 
+            /* One column: since v1.3.0 a card also carries the folder tools, and two of them no
+               longer fit a phone (the right card's buttons ended past the screen edge). */
             .preset-list {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: 1fr;
             }
         }
+
+        /* =====================================================================================
+           UI 디자인 스킨 (🖌️ 버튼, v1.3.0) — EDITOR ONLY. Nothing here may touch --log-*, bubble or
+           #log-preview colours: the log, its Arca export and the saved PNG must not change with a skin.
+           Kept LAST in the file so equal-specificity rules here win on source order as well.
+           ===================================================================================== */
+
+        /* --- design picker (all skins) --- */
+        .ui-skin-menu {
+            position: fixed;
+            z-index: 10001;
+            width: min(340px, calc(100vw - 16px));
+            padding: 8px;
+            border: 1px solid var(--panel-border);
+            border-radius: 12px;
+            background: var(--panel-bg);
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.32);
+            overflow-y: auto;
+        }
+        .ui-skin-menu-title { padding: 6px 8px 10px; font-size: 13px; font-weight: 700; color: var(--text-primary); }
+        .ui-skin-menu-title span { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; color: var(--text-secondary); }
+        .ui-skin-menu button {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 10px;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            background: transparent;
+            color: var(--text-primary);
+            text-align: left;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .ui-skin-menu button:hover { background: rgba(127, 127, 127, 0.12); }
+        .ui-skin-menu button[aria-checked="true"] { border-color: var(--accent); background: rgba(127, 127, 127, 0.08); }
+        .ui-skin-swatches { display: inline-flex; flex: 0 0 auto; border-radius: 8px; overflow: hidden; border: 1px solid rgba(127, 127, 127, 0.35); }
+        .ui-skin-swatches i { width: 16px; height: 34px; }
+        .ui-skin-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .ui-skin-text b { font-size: 14px; }
+        .ui-skin-text small { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+
+        /* --- palettes --- */
+        body.ui-skin-paper {
+            --app-bg: #f3f1ed; --panel-bg: #fbfaf7; --panel-border: #e3dfd6;
+            --input-bg: #f4f2ed; --input-border: #d8d3c8;
+            --text-primary: #242320; --text-secondary: #716d66;
+            --accent: #3d6b55; --accent-hover: #335b48;
+            --ui-section-bg: #ffffff; --ui-stage-bg: #ebe8e1; --ui-stage-check: #e2ded5; --ui-danger: #b4483d;
+        }
+        body.ui-skin-editorial {
+            --app-bg: #efebe3; --panel-bg: #f6f3ec; --panel-border: #d6cfc2;
+            --input-bg: #efebe3; --input-border: #bdb4a5;
+            --text-primary: #171313; --text-secondary: #6f6a62;
+            --accent: #b35a4f; --accent-hover: #9c4c42;
+            --ui-section-bg: transparent; --ui-stage-bg: #e4dfd5; --ui-stage-check: #dad3c6; --ui-danger: #b35a4f;
+        }
+        body.ui-skin-night {
+            --app-bg: #121317; --panel-bg: #18191e; --panel-border: #2a2c33;
+            --input-bg: #202228; --input-border: #353843;
+            --text-primary: #e8e6f0; --text-secondary: #9a98a6;
+            --accent: #8b7cf6; --accent-hover: #7a6aea;
+            --ui-section-bg: #1c1d23; --ui-stage-bg: #0e0f12; --ui-stage-check: #15161b; --ui-danger: #e5787a;
+        }
+
+        /* --- shared calm treatment for every redesigned skin --- */
+        body.ui-skin-custom {
+            font-family: 'Pretendard Variable', Pretendard, 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        body.ui-skin-custom .mode-toggle:not(#ui-skin-button) { display: none; } /* fixed palette per skin */
+        body.ui-skin-custom .app-header h1 {
+            background: none;
+            -webkit-text-fill-color: currentColor;
+            color: var(--text-primary);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+        }
+        /* One filled call to action (✨ 복사); every other header button is quiet. */
+        body.ui-skin-custom .app-header .btn,
+        body.ui-skin-custom .btn-secondary {
+            background: transparent;
+            color: var(--text-primary);
+            border: 1px solid var(--input-border);
+            box-shadow: none;
+        }
+        body.ui-skin-custom .app-header .btn:hover,
+        body.ui-skin-custom .btn-secondary:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+        body.ui-skin-custom .app-header .header-right .btn-primary,
+        body.ui-skin-custom .sidebar .btn-primary,
+        body.ui-skin-custom .preset-panel .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #ffffff;
+        }
+        body.ui-skin-custom .btn-success { background: transparent; color: var(--text-primary); border: 1px solid var(--input-border); }
+        body.ui-skin-custom .section {
+            background: var(--ui-section-bg);
+            border: 1px solid var(--panel-border);
+            box-shadow: none;
+        }
+        body.ui-skin-custom .section-title { color: var(--text-primary); font-weight: 700; }
+        body.ui-skin-custom .tabs { gap: 0; border-bottom: 1px solid var(--panel-border); }
+        body.ui-skin-custom .tab { border-radius: 0; font-weight: 600; }
+        body.ui-skin-custom .tab:hover { background: transparent; color: var(--text-primary); }
+        body.ui-skin-custom .tab.active {
+            background: transparent;
+            color: var(--text-primary);
+            box-shadow: inset 0 -2px 0 var(--accent);
+        }
+        /* The checkerboard is the editor's "this part is transparent" cue for a log whose
+           background is 없음, so redesigned skins keep it, just in their own tones. */
+        body.ui-skin-custom .preview-wrapper,
+        body.ui-skin-custom.light-mode .preview-wrapper {
+            background-color: var(--ui-stage-bg);
+            background-image:
+                linear-gradient(45deg, var(--ui-stage-check) 25%, transparent 25%),
+                linear-gradient(-45deg, var(--ui-stage-check) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, var(--ui-stage-check) 75%),
+                linear-gradient(-45deg, transparent 75%, var(--ui-stage-check) 75%);
+        }
+        body.ui-skin-custom .preview-wrapper.html-mode { background: var(--input-bg); background-image: none; }
+        /* The log must not see the skin. A few log elements (the === dot divider, the empty-state
+           hint) read editor variables, so inside the preview they are pinned to the values every
+           earlier build rendered with (classic). Measured: the divider shade followed the skin. */
+        body.ui-skin-custom #log-preview {
+            --app-bg: #1a1b1e; --panel-bg: #25262b; --panel-border: #373a40;
+            --input-bg: #2c2e33; --input-border: #495057;
+            --text-primary: #f1f3f5; --text-secondary: #adb5bd;
+            --accent: #339af0; --accent-hover: #228be6;
+        }
+        /* The many small coloured buttons (red ×, blue ✏️, yellow 📝, green block tools) become one
+           neutral family; only a hover says "delete". Inline-styled ones need !important. */
+        body.ui-skin-custom .log-block-actions button,
+        body.ui-skin-custom .rule-item .btn-remove,
+        body.ui-skin-custom .btn-delete-char,
+        body.ui-skin-custom .btn-color-edit,
+        body.ui-skin-custom .preset-item-btn,
+        body.ui-skin-custom .saved-theme-row > button:not(.btn),
+        body.ui-skin-custom #bot-avatar-remove,
+        body.ui-skin-custom #persona-avatar-remove,
+        body.ui-skin-custom #char-links-container + button {
+            background: transparent !important;
+            color: var(--text-secondary) !important;
+            border: 1px solid var(--input-border) !important;
+            box-shadow: none !important;
+        }
+        body.ui-skin-custom .log-block-actions .btn-delete:hover,
+        body.ui-skin-custom .rule-item .btn-remove:hover,
+        body.ui-skin-custom .btn-delete-char:hover,
+        body.ui-skin-custom .preset-item-btn.delete:hover,
+        body.ui-skin-custom .saved-theme-row > button:not(.btn):last-child:hover {
+            color: var(--ui-danger) !important;
+            border-color: var(--ui-danger) !important;
+        }
+        /* With a border these read as boxes, so give the tiny ones a tappable size. */
+        body.ui-skin-custom .btn-delete-char,
+        body.ui-skin-custom .btn-color-edit {
+            min-width: 26px;
+            min-height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+        body.ui-skin-custom .btn-add-block,
+        body.ui-skin-custom .btn-add-rule { border: 1px dashed var(--input-border); color: var(--text-secondary); background: transparent; }
+        body.ui-skin-custom .btn-add-block:hover,
+        body.ui-skin-custom .btn-add-rule:hover { border-color: var(--accent); color: var(--accent); }
+
+        /* --- 에디토리얼: rules instead of cards, mono micro-labels, square corners --- */
+        body.ui-skin-editorial .app-header { border-bottom: 1px solid var(--text-primary); }
+        body.ui-skin-editorial .section {
+            border: none;
+            border-top: 1px solid var(--text-primary);
+            border-radius: 0;
+            padding: 14px 2px 18px;
+        }
+        /* Mono only where it reads as a label; Hangul gets no tracking (spaced syllables look broken). */
+        body.ui-skin-editorial .section-title {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, 'Pretendard Variable', Pretendard, monospace;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.01em;
+        }
+        /* Memorial-style index numbers: 01, 02, 03 … per tab, in the accent. */
+        body.ui-skin-editorial .tab-content { counter-reset: lc-section; }
+        body.ui-skin-editorial .section-title::before {
+            counter-increment: lc-section;
+            content: counter(lc-section, decimal-leading-zero);
+            width: auto;
+            height: auto;
+            background: none;
+            border-radius: 0;
+            color: var(--accent);
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-right: 4px;
+        }
+        body.ui-skin-editorial .input-label { font-size: 11px; font-weight: 600; letter-spacing: 0; }
+        body.ui-skin-editorial .btn,
+        body.ui-skin-editorial input[type="text"],
+        body.ui-skin-editorial input[type="number"],
+        body.ui-skin-editorial textarea,
+        body.ui-skin-editorial select,
+        body.ui-skin-editorial .log-block,
+        body.ui-skin-editorial .preset-item,
+        body.ui-skin-editorial .list-folder-chip { border-radius: 2px !important; }
+        body.ui-skin-editorial .app-header .btn,
+        body.ui-skin-editorial .btn-secondary { border-color: var(--text-primary); }
+
+        body.ui-skin-editorial .app-header { border-bottom-width: 2px; }
+        body.ui-skin-editorial .app-header h1 { font-size: 24px; font-weight: 900; letter-spacing: -0.05em; text-transform: uppercase; }
+        body.ui-skin-editorial .tabs { border-bottom: 2px solid var(--text-primary); }
+        body.ui-skin-editorial .tab.active { color: #ffffff; background: var(--text-primary); box-shadow: none; }
+
+        /* --- 종이: Mosaic-style — logo left, actions right, soft white cards with rounded rows --- */
+        @media (min-width: 1025px) {
+            body.ui-skin-paper .app-header { justify-content: flex-start; padding: 12px 28px; }
+            body.ui-skin-paper .app-header .header-right { margin-left: auto; }
+        }
+        body.ui-skin-paper .section {
+            border-radius: 16px;
+            border-color: #ebe7de;
+            box-shadow: 0 1px 2px rgba(60, 50, 30, 0.06), 0 6px 18px rgba(60, 50, 30, 0.04);
+        }
+        body.ui-skin-paper .section-title { font-size: 15px; }
+        body.ui-skin-paper .section-title::before { width: 6px; height: 6px; border-radius: 50%; }
+        body.ui-skin-paper .app-header .btn { border-radius: 999px; }
+        body.ui-skin-paper .tab.active { box-shadow: inset 0 -3px 0 var(--accent); }
+
+        /* --- 차분한 밤: pill controls, glassy cards, a soft accent glow --- */
+        body.ui-skin-night .app-header { background: rgba(21, 22, 26, 0.92); }
+        body.ui-skin-night .section {
+            border-radius: 18px;
+            border-color: #2a2c35;
+            background: linear-gradient(180deg, #1e1f26 0%, #1a1b21 100%);
+        }
+        body.ui-skin-night .btn,
+        body.ui-skin-night .list-folder-chip,
+        body.ui-skin-night .btn-add-block,
+        body.ui-skin-night .btn-add-rule { border-radius: 999px; }
+        body.ui-skin-night .tabs { gap: 6px; border-bottom: none; padding: 4px; border-radius: 999px; background: #1e1f26; }
+        body.ui-skin-night .tab { border-radius: 999px; }
+        body.ui-skin-night .tab.active { background: var(--accent); color: #ffffff; box-shadow: 0 0 18px rgba(139, 124, 246, 0.45); }
+        body.ui-skin-night .app-header .header-right .btn-primary { box-shadow: 0 0 22px rgba(139, 124, 246, 0.5); }
+        body.ui-skin-night .section-title::before { box-shadow: 0 0 10px var(--accent); }
 
     </style>
 </head>
@@ -2900,6 +3152,7 @@
         <div class="header-left">
             <h1>🧁 Log Cupcake</h1>
             <button class="mode-toggle" onclick="toggleDarkMode()" title="라이트/다크 모드 전환">🌙</button>
+            <button class="mode-toggle" id="ui-skin-button" type="button" title="화면 디자인 고르기" aria-haspopup="true" aria-expanded="false">🖌️</button>
         </div>
         <div class="header-actions">
             <button class="btn btn-secondary" onclick="togglePresetPanel()" title="프리셋 관리">📁 프리셋</button>
@@ -3366,7 +3619,7 @@ USER: "반가워요."
                                  behind the cover. The export therefore places it directly under the cover. -->
                             <p class="presentation-hint" id="cover-caption-arca-note">미리보기·📷 이미지 저장에선 표지 위에 겹쳐 보여요. 아카라이브는 글 저장 때 겹치기를 지워 버려서, ✨ 복사·HTML로 붙여넣으면 표지 바로 아래 칸으로 들어가요.</p>
                             <button type="button" id="cover-image-remove" class="btn btn-secondary">표지 이미지 제거</button>
-                            <p class="presentation-hint">원본 비율로 표시합니다. 이름·소개는 2분할에서 카드가 보이는 쪽(사진이나 소개가 있는 쪽)만 반투명 칸에 올라가고, 프로필 사진은 표지가 대신합니다. 2분할로 돌아가면 기존 프로필 사진과 소개가 다시 나타납니다.</p>
+                            <p class="presentation-hint">원본 비율로 표시합니다. 이름·소개는 이름을 바꿨거나 사진·소개가 있는 쪽만 반투명 칸에 올라가고(기본 이름 AI·USER 그대로면 안 나와요), 프로필 사진은 표지가 대신합니다. 2분할로 돌아가면 기존 프로필 사진과 소개가 다시 나타납니다.</p>
                         </div>
                     </div>
                     <div class="section">
@@ -3720,17 +3973,23 @@ USER: "반가워요."
         };
     }
 
-    // The cover caption shows exactly the sides the split cards would show — one visibility rule for
-    // both layouts, so switching layout can never make a character appear in one and vanish in the other.
-    // Names only, no avatars: the cover image IS the picture, and a cover that also carried the profile
-    // images would be the split layout stacked under a banner.
+    // The default names (the renderers fall back to the same literals when a name field is empty).
+    // A side still carrying its default name has said nothing about itself.
+    const DEFAULT_SPEAKER_NAMES = Object.freeze({ bot: 'AI', persona: 'USER' });
+
+    // The cover caption shows a side the split cards would show (it has an avatar or a bio) AND a side
+    // whose name the user changed (owner 2026-10-02): a cover stands in for the avatars, so a renamed
+    // character with no bio is exactly what the caption is for. An untouched "AI"/"USER" stays off, or
+    // every cover log would grow a caption nobody wrote.
+    // Names only, no avatars: the cover image IS the picture.
     function createCoverCaptionModel({ enabled, profileCardModel, aiName, userName, botBio, personaBio }) {
         if (!enabled) return { show: false, cells: [] };
+        const named = (name, role) => typeof name === 'string' && name.trim() !== '' && name.trim() !== DEFAULT_SPEAKER_NAMES[role];
         const cells = [];
-        if (profileCardModel.bot.show) {
+        if (profileCardModel.bot.show || named(aiName, 'bot')) {
             cells.push({ role: 'bot', name: aiName, bio: profileCardModel.bot.showBio ? botBio : '' });
         }
-        if (profileCardModel.persona.show) {
+        if (profileCardModel.persona.show || named(userName, 'persona')) {
             cells.push({ role: 'persona', name: userName, bio: profileCardModel.persona.showBio ? personaBio : '' });
         }
         return { show: cells.length > 0, cells };
@@ -4370,7 +4629,7 @@ USER: "반가워요."
     //   `loadCustomTheme(i)`) is keyed by position in the full list, never by position on a page.
 
     // Lists that carry folders and a page size. A stored key outside this list is dropped on read.
-    const LIST_KEYS = Object.freeze(['characters', 'regex', 'themes']);
+    const LIST_KEYS = Object.freeze(['characters', 'regex', 'themes', 'presets']);
 
     const DEFAULT_PAGE_SIZE = 10;
     const MIN_PAGE_SIZE = 1;
@@ -4568,6 +4827,7 @@ USER: "반가워요."
 
         function openMoveMenu(anchor, index) {
             closeMoveMenu();
+            document.querySelector('.ui-skin-menu')?.remove();
             const current = normalizeFolderName(getItemFolders()[index]);
             const summary = summarizeFolders(registeredFolders(), getItemFolders());
             const menu = document.createElement('div');
@@ -4605,7 +4865,7 @@ USER: "반가워요."
 
         // Every item gets a drag handle and a 📁 button. Drag-and-drop is dead on touch screens, so the
         // button is the path that always works; the handle is the desktop shortcut the owner asked for.
-        function decorate(element, index) {
+        function decorate(element, index, folders) {
             let tools = element.querySelector('.list-item-tools');
             if (!tools) {
                 const slot = element.querySelector('[data-organizer-slot]') || element;
@@ -4631,7 +4891,7 @@ USER: "반가워요."
                 });
             }
             element.dataset.organizerIndex = String(index);
-            const folder = normalizeFolderName(getItemFolders()[index]);
+            const folder = normalizeFolderName(folders[index]);
             tools.querySelector('.list-move-button').title = folder ? `폴더: ${folder} · 눌러서 이동` : '폴더로 이동';
         }
 
@@ -4681,8 +4941,9 @@ USER: "반가워요."
             const view = computeListView({ folders, filter, pageSize: prefs.pageSize, page });
             page = view.page;
             const visible = new Set(view.indexes);
+            // One folder read per refresh: for presets it parses the whole saved array, avatars included.
             elements.forEach((element, index) => {
-                decorate(element, index);
+                decorate(element, index, folders);
                 element.hidden = !visible.has(index);
             });
             // The bar earns its space only once there is something to organise.
@@ -4744,10 +5005,15 @@ USER: "반가워요."
 
         return {
             refresh,
+            // The named folder being viewed, or '' — lets a save write the folder in the SAME storage
+            // write as the new item, so a failure can never leave a "saved" item hidden from the view.
+            activeFolder: () => (filter !== FOLDER_FILTER_ALL && filter !== '' ? filter : ''),
             // An appended item lands on the last page, out of sight. Show it, and file it into the
             // folder being viewed — adding while looking at a folder means adding to that folder.
             revealNew(index) {
-                if (filter !== FOLDER_FILTER_ALL && filter !== '') setItemFolder(index, filter);
+                // A save that already wrote the folder (see activeFolder) needs no second write.
+                if (filter !== FOLDER_FILTER_ALL && filter !== ''
+                    && normalizeFolderName(getItemFolders()[index]) !== filter) setItemFolder(index, filter);
                 const { pageSize } = readPrefs()[key];
                 page = pageForIndex({ folders: getItemFolders(), filter, pageSize, index }) ?? page;
                 refresh();
@@ -4765,6 +5031,10 @@ USER: "반가워요."
 
     function refreshListOrganizer(key) {
         organizers.get(key)?.refresh();
+    }
+
+    function getActiveListFolder(key) {
+        return organizers.get(key)?.activeFolder() || '';
     }
 
     function revealNewListItem(key, index) {
@@ -5372,7 +5642,8 @@ USER: "반가워요."
                 };
 
                 let savedThemes = readJsonArray('customThemes');
-                savedThemes.push(theme);
+                // Filed into the folder being viewed in the same write as the theme itself.
+                savedThemes.push(withFolder(theme, getActiveListFolder('themes')));
                 if (!safeSetItem('customThemes', JSON.stringify(savedThemes))) return;
                 renderSavedThemes();
                 revealNewListItem('themes', savedThemes.length - 1);
@@ -8258,11 +8529,13 @@ USER: "반가워요."
 
                 if (savedPresets.length === 0) {
                     container.innerHTML = '<div class="preset-empty">저장된 프리셋이 없습니다.<br>상단의 "저장" 버튼으로 현재 설정을 저장하세요.</div>';
+                    refreshListOrganizer('presets');
                     return;
                 }
 
                 container.innerHTML = savedPresets.map((p, i) => `
                 <div class="preset-item">
+                    <span data-organizer-slot></span>
                     <span class="preset-item-name" onclick="loadPresetFromPanel(${i})" title="${escapeHtmlAttribute(p.name)}">${escapeHtml(p.name)}</span>
                     <div class="preset-item-actions">
                         <button class="preset-item-btn rename" onclick="renamePresetFromPanel(${i})" title="이름 수정">📝</button>
@@ -8271,6 +8544,31 @@ USER: "반가워요."
                     </div>
                 </div>
             `).join('');
+                refreshListOrganizer('presets');
+            }
+
+            // A preset's own folder is a top-level `folder` key, separate from the folders of the
+            // characters and rules stored INSIDE it. Saved on the spot, like theme folders.
+            function getPresetFolders() {
+                return readJsonArray('logPresets').map(preset => normalizeFolderName(preset?.folder));
+            }
+
+            function setPresetFolder(index, folder) {
+                const savedPresets = readJsonArray('logPresets');
+                if (!savedPresets[index]) return false;
+                savedPresets[index] = withFolder(savedPresets[index], folder);
+                if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return false;
+                renderPresetListPanel();
+                return true;
+            }
+
+            function renamePresetFolders(oldName, newName) {
+                const savedPresets = readJsonArray('logPresets');
+                const renamed = savedPresets.map(preset =>
+                    normalizeFolderName(preset?.folder) === oldName ? withFolder(preset, newName) : preset);
+                if (!safeSetItem('logPresets', JSON.stringify(renamed))) return false;
+                renderPresetListPanel();
+                return true;
             }
 
             function applyPresetData(preset, { persistPresentation = true } = {}) {
@@ -8469,7 +8767,8 @@ USER: "반가워요."
 
                 if (!confirm(`"${oldPreset.name}" 프리셋을 현재 설정으로 수정하시겠습니까?`)) return;
 
-                const newPreset = collectPresetData();
+                // Rebuilt from the current controls; name and folder are the two fields they do not own.
+                const newPreset = withFolder(collectPresetData(), oldPreset.folder);
                 newPreset.name = oldPreset.name;
 
                 // Resize and compress avatars to save storage space
@@ -9278,6 +9577,124 @@ USER: "반가워요."
                 return html;
             }
 
+    // The catalogue of app-UI designs the owner can preview and choose (2026-10-02). A skin restyles
+    // the EDITOR only — header, sidebar, buttons, the stage behind the preview. The log itself (its
+    // themes, the Arca export, the saved PNG) never reads a skin, so switching cannot change output.
+    //
+    // Stable IDs are persisted; never rename one. `classic` is the design every earlier build shipped,
+    // and the only one that follows the 🌙 light/dark toggle (each other skin is one fixed palette).
+    const UI_SKINS = Object.freeze([
+        Object.freeze({ id: 'classic', name: '클래식', note: '지금까지의 디자인 · 🌙 다크/라이트 전환',
+            swatches: Object.freeze(['#25262b', '#339af0', '#40c057']) }),
+        Object.freeze({ id: 'paper', name: '종이', note: '따뜻한 미색 바탕 + 초록 포인트 하나 · 조각로그 느낌',
+            swatches: Object.freeze(['#f3f1ed', '#ffffff', '#3d6b55']) }),
+        Object.freeze({ id: 'editorial', name: '에디토리얼', note: '먹색 글자 + 테라코타 · 모노 소제목 · 메모리얼 느낌',
+            swatches: Object.freeze(['#efebe3', '#171313', '#b35a4f']) }),
+        Object.freeze({ id: 'night', name: '차분한 밤', note: '어두운 바탕 + 라벤더 포인트 하나 · 버튼 색 정리',
+            swatches: Object.freeze(['#16171b', '#22232a', '#8b7cf6']) })
+    ]);
+
+    const DEFAULT_UI_SKIN = 'classic';
+
+    function normalizeUiSkin(value) {
+        return UI_SKINS.some(skin => skin.id === value) ? value : DEFAULT_UI_SKIN;
+    }
+
+    // Only `classic` keeps the old per-colour buttons and the light/dark toggle.
+    function isCustomUiSkin(id) {
+        return normalizeUiSkin(id) !== DEFAULT_UI_SKIN;
+    }
+
+    // This module owns the 🖌️ design picker: which app-UI skin is on the <body>, the menu that lets the
+
+    // A plain string, not JSON: one value, nothing to normalise beyond the catalogue check.
+    const UI_SKIN_STORAGE_KEY = 'logUiSkin';
+    const MENU_CLASS = 'ui-skin-menu';
+
+    function readStoredSkin() {
+        try { return normalizeUiSkin(localStorage.getItem(UI_SKIN_STORAGE_KEY)); }
+        catch (e) { return normalizeUiSkin(null); }
+    }
+
+    // The redesigned skins set their UI in Pretendard. It is lazily fetched like the optional log
+    // fonts, so `classic` users never pay for it.
+    function ensureUiFont() {
+        const href = getFontStylesheet('pretendard');
+        if (!href || document.querySelector(`link[data-ui-skin-font]`)) return;
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = href;
+        link.dataset.uiSkinFont = 'true';
+        document.head.appendChild(link);
+    }
+
+    function applyUiSkin(value, { persist = true } = {}) {
+        const id = normalizeUiSkin(value);
+        const body = document.body;
+        for (const skin of UI_SKINS) body.classList.remove(`ui-skin-${skin.id}`);
+        body.classList.remove('ui-skin-custom');
+        if (isCustomUiSkin(id)) {
+            body.classList.add(`ui-skin-${id}`, 'ui-skin-custom');
+            ensureUiFont();
+        }
+        body.dataset.uiSkin = id;
+        if (persist) safeSetItem(UI_SKIN_STORAGE_KEY, id, { evictCaches: false });
+        return id;
+    }
+
+    function closeMenu() {
+        document.querySelector(`.${MENU_CLASS}`)?.remove();
+        document.getElementById('ui-skin-button')?.setAttribute('aria-expanded', 'false');
+    }
+
+    function openMenu(button) {
+        closeMenu();
+        closeMoveMenu();
+        const current = document.body.dataset.uiSkin;
+        const menu = document.createElement('div');
+        menu.className = MENU_CLASS;
+        menu.setAttribute('role', 'menu');
+        menu.innerHTML = '<div class="ui-skin-menu-title">화면 디자인 고르기 <span>로그 결과물은 바뀌지 않아요</span></div>'
+            + UI_SKINS.map(skin => `<button type="button" role="menuitemradio" aria-checked="${skin.id === current}" data-skin="${escapeHtmlAttribute(skin.id)}">`
+                + `<span class="ui-skin-swatches">${skin.swatches.map(color => `<i style="background:${color}"></i>`).join('')}</span>`
+                + `<span class="ui-skin-text"><b>${escapeHtml(skin.name)}</b><small>${escapeHtml(skin.note)}</small></span></button>`).join('');
+        menu.addEventListener('click', event => {
+            const option = event.target.closest('button[data-skin]');
+            if (!option) return;
+            event.stopPropagation();
+            applyUiSkin(option.dataset.skin);
+            // Stay open so the owner can flip between designs and compare.
+            menu.querySelectorAll('button[data-skin]').forEach(item => item.setAttribute('aria-checked', String(item === option)));
+        });
+        document.body.appendChild(menu);
+        // Never past the bottom of a short (landscape phone) screen: the rest scrolls inside the menu.
+        const rect = button.getBoundingClientRect();
+        const top = Math.min(rect.bottom + 8, Math.max(8, window.innerHeight - 160));
+        menu.style.top = `${top}px`;
+        menu.style.maxHeight = `${window.innerHeight - top - 8}px`;
+        menu.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - menu.offsetWidth - 8))}px`;
+        button.setAttribute('aria-expanded', 'true');
+    }
+
+    function initializeUiSkins() {
+        if (!document.body.dataset.uiSkin) applyUiSkin(readStoredSkin(), { persist: false });
+        const button = document.getElementById('ui-skin-button');
+        button?.addEventListener('click', event => {
+            event.stopPropagation();
+            if (document.querySelector(`.${MENU_CLASS}`)) closeMenu();
+            else openMenu(button);
+        });
+        document.addEventListener('click', event => {
+            if (!event.target.closest?.(`.${MENU_CLASS}`)) closeMenu();
+        });
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMenu(); });
+        window.addEventListener('resize', closeMenu);
+    }
+
+    // Applied the moment this module evaluates — the bundle runs at the end of <body>, before first
+    // paint — instead of on window load, which showed the dark classic editor first on every visit.
+    if (typeof document !== 'undefined' && document.body?.classList) applyUiSkin(readStoredSkin(), { persist: false });
+
     // ========== Live Preview + Focus Tracking ==========
             // Add event listener to textarea in first block
             document.querySelectorAll('.log-block-input').forEach(textarea => {
@@ -9430,7 +9847,10 @@ AI: 빙그레 웃는다`;
                     });
                 }
 
-                // Folder bar + pager for the three lists that grow without bound. Registered before the
+                // The editor's design first, so everything below renders inside the chosen skin.
+                initializeUiSkins();
+
+                // Folder bar + pager for the lists that grow without bound. Registered before the
                 // first render below so that render already lands on page 1 of the stored page size.
                 registerListOrganizer({
                     key: 'characters', label: '캐릭터',
@@ -9455,6 +9875,14 @@ AI: 빙그레 웃는다`;
                     getItemFolders: getThemeFolders,
                     setItemFolder: setThemeFolder,
                     renameItemFolders: renameThemeFolders
+                });
+                registerListOrganizer({
+                    key: 'presets', label: '프리셋',
+                    listElement: document.getElementById('preset-list-panel'),
+                    getItemElements: () => document.querySelectorAll('#preset-list-panel .preset-item'),
+                    getItemFolders: getPresetFolders,
+                    setItemFolder: setPresetFolder,
+                    renameItemFolders: renamePresetFolders
                 });
                 initializeListOrganizerDismissal();
 
@@ -9550,7 +9978,8 @@ AI: 빙그레 웃는다`;
                 const name = prompt('프리셋 이름을 입력하세요:');
                 if (!name) return;
 
-                const preset = collectPresetData();
+                // Filed into the folder being viewed in the same write, never by a second one that could fail.
+                const preset = withFolder(collectPresetData(), getActiveListFolder('presets'));
                 preset.name = name;
 
                 // Resize and compress avatars to save storage space
@@ -9568,6 +9997,8 @@ AI: 빙그레 웃는다`;
                 // preset the user can see but that is not actually stored.
                 if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return;
                 renderPresetListPanel();
+                // Saved while a folder is open → filed there, and its page is shown.
+                revealNewListItem('presets', savedPresets.length - 1);
                 alert('프리셋이 저장되었습니다!');
             }
 
