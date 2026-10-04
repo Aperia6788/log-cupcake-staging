@@ -3429,13 +3429,13 @@
                                     style="width:16px; height:16px; cursor:pointer;">
                                 <span>블록 접기</span>
                             </label>
-                            <!-- The "첫 블록 펼침" convenience is preview-only on purpose: Arca's server
-                                 save strips the `open` attribute, so a reader always lands on fully
-                                 collapsed blocks. Re-emitting `open` cannot beat a server-side strip,
-                                 so the honest fix is telling the author here. Settled by an
-                                 authenticated round trip — .report/arca-details-roundtrip-2026-09-17.md. -->
+                            <!-- Open/closed is preview-only on purpose: the preview keeps whatever the
+                                 author opened across re-renders, while the copy ships every block
+                                 collapsed (owner 2026-10-04) — which is also all a reader gets, since
+                                 Arca's server save strips `open` (authenticated round trip,
+                                 .report/arca-details-roundtrip-2026-09-17.md). Told here, beside the box. -->
                             <span style="font-size:11px; color:var(--text-secondary);"
-                                title="아카라이브는 글을 저장할 때 접기 태그의 open 속성을 제거해요. 접기 자체는 그대로 동작하니, 독자는 블록을 눌러서 펼치게 됩니다.">(미리보기·HTML 공통 · 첫 블록 펼침은 미리보기 전용 — 아카에선 전부 접혀 보여요)</span>
+                                title="미리보기에서 펼친 블록은 작업용이에요. 복사본은 블록이 전부 접힌 채로 나가고, 아카라이브도 저장할 때 접기 태그의 open 속성을 제거해요. 독자는 블록을 눌러서 펼치게 됩니다.">(미리보기·HTML 공통 · 펼침은 미리보기 전용 — 복사본·아카에선 전부 접혀 보여요)</span>
                             <span style="color:var(--panel-border); margin:0 4px;">|</span>
                             <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-size:13px;">
                                 <input type="checkbox" id="narration-italic"
@@ -4038,10 +4038,20 @@ USER: "반가워요."
             // summary bar IS a heading, and a lone block is the ordinary case, so folding it would
             // stamp "블록 1" across nearly every log and hide the whole thing behind a pointless click.
             fold: Boolean(isFolded) && blockCount > 1,
-            // The first block opens so a reader sees content without clicking. It is a plain
-            // <details open>, so it still closes on click like every other block.
+            // PREVIEW-ONLY default for a block appearing on screen for the first time: the first one
+            // opens so the author sees content without clicking. A block already on screen keeps the
+            // state the author left it in (resolveFoldOpen). The Arca export never reads this — the
+            // copy ships every block collapsed, which is also all a reader ever gets because Arca's
+            // save strips `open` (round trip 2026-09-17; owner ruling 2026-10-04).
             startOpen: blockIndex === 0
         };
+    }
+
+    // The preview is rebuilt on every keystroke, and resetting each fold to its default there closed
+    // the very block the author had opened to check an edit. `previousOpen` is that block's state in
+    // the preview being replaced; undefined means it was not on screen, so the default applies.
+    function resolveFoldOpen(startOpen, previousOpen) {
+        return typeof previousOpen === 'boolean' ? previousOpen : startOpen;
     }
 
     function createCharacterLinkDisplayModel(charLinks, primaryCharacterName) {
@@ -7794,6 +7804,9 @@ USER: "반가워요."
                     return titleInput ? titleInput.value : '';
                 });
                 const blockColors = Array.from(document.querySelectorAll('.log-block')).map(block => block.dataset.blockColor || '');
+                // Fold state follows the block's id, not its position, so moving or deleting a block
+                // never hands its open/closed state to a neighbour.
+                const blockKeys = Array.from(document.querySelectorAll('.log-block')).map((block, index) => block.dataset.blockId || `index-${index}`);
                 const blockFoldingPreview = document.getElementById('block-folding').checked;
                 const regexRules = collectRegexRules();
 
@@ -7808,6 +7821,12 @@ USER: "반가워요."
                 });
 
                 const preview = document.getElementById('log-preview');
+                // Read before the rebuild below replaces these nodes: what the author opened or closed
+                // to check an edit must survive the re-render that edit triggers.
+                const previousFoldOpen = new Map(Array.from(
+                    preview.querySelectorAll('details.log-fold[data-block-key]'),
+                    fold => [fold.dataset.blockKey, fold.open]
+                ));
                 const unconfiguredCharacterNumbers = new Set();
                 let html = '';
 
@@ -7989,7 +8008,9 @@ USER: "반가워요."
                     }
 
                     if (blockLabel.fold) {
-                        html += `<details class="log-fold"${blockLabel.startOpen ? ' open' : ''}><summary class="log-fold-summary" style="color:${blockLabel.color};">${escapeHtml(blockLabel.title)}</summary><div class="log-fold-body">`;
+                        const blockKey = blockKeys[blockIndex];
+                        const foldOpen = resolveFoldOpen(blockLabel.startOpen, previousFoldOpen.get(blockKey));
+                        html += `<details class="log-fold" data-block-key="${escapeHtmlAttribute(blockKey)}"${foldOpen ? ' open' : ''}><summary class="log-fold-summary" style="color:${blockLabel.color};">${escapeHtml(blockLabel.title)}</summary><div class="log-fold-body">`;
                     }
 
                     const lines = blockText.split('\n');
@@ -9292,8 +9313,11 @@ USER: "반가워요."
                         html += `<div style="margin:16px 0 12px;padding:10px 20px;border-radius:10px;font-size:1.1em;font-weight:700;background:rgba(128,128,128,0.08);text-align:center;border:1px solid rgba(128,128,128,0.15);"><span style="color:${blockLabel.color}">${escapeHtml(blockLabel.title)}</span></div>`;
                     }
 
+                    // Every copied block ships collapsed: the paste should look like what a reader gets
+                    // (Arca's save strips `open` anyway), and the preview's open blocks are the
+                    // author's working state, not part of the log. Owner ruling 2026-10-04.
                     if (blockLabel.fold) {
-                        html += `<details${blockLabel.startOpen ? ' open' : ''} style="margin:10px 0;"><summary style="cursor:pointer;padding:8px 12px;background:rgba(128,128,128,0.1);border-radius:6px;font-weight:600;color:${blockLabel.color}"><span style="color:${blockLabel.color}">${escapeHtml(blockLabel.title)}</span></summary><div style="padding:10px 0;">`;
+                        html += `<details style="margin:10px 0;"><summary style="cursor:pointer;padding:8px 12px;background:rgba(128,128,128,0.1);border-radius:6px;font-weight:600;color:${blockLabel.color}"><span style="color:${blockLabel.color}">${escapeHtml(blockLabel.title)}</span></summary><div style="padding:10px 0;">`;
                     }
 
                     const lines = blockText.split('\n');
