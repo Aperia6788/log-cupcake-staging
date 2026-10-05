@@ -2910,25 +2910,25 @@
 
         /* --- palettes --- */
         body.ui-skin-paper {
-            --app-bg: #f3f1ed; --panel-bg: #fbfaf7; --panel-border: #e3dfd6;
-            --input-bg: #f4f2ed; --input-border: #d8d3c8;
-            --text-primary: #242320; --text-secondary: #716d66;
-            --accent: #3d6b55; --accent-hover: #335b48;
-            --ui-section-bg: #ffffff; --ui-stage-bg: #ebe8e1; --ui-stage-check: #e2ded5; --ui-danger: #b4483d;
+            --app-bg: #f6f1e9; --panel-bg: #fdfaf5; --panel-border: #e7ded2;
+            --input-bg: #f6f1ea; --input-border: #dbcfc1;
+            --text-primary: #2a2420; --text-secondary: #776b62;
+            --accent: #8a5a3c; --accent-hover: #74492f;
+            --ui-section-bg: #ffffff; --ui-stage-bg: #eee7dc; --ui-stage-check: #e5dccf; --ui-danger: #b4483d;
         }
         body.ui-skin-editorial {
-            --app-bg: #efebe3; --panel-bg: #f6f3ec; --panel-border: #d6cfc2;
-            --input-bg: #efebe3; --input-border: #bdb4a5;
-            --text-primary: #171313; --text-secondary: #6f6a62;
-            --accent: #b35a4f; --accent-hover: #9c4c42;
-            --ui-section-bg: transparent; --ui-stage-bg: #e4dfd5; --ui-stage-check: #dad3c6; --ui-danger: #b35a4f;
+            --app-bg: #ecebe6; --panel-bg: #f4f3ef; --panel-border: #d2cfc6;
+            --input-bg: #ecebe6; --input-border: #b8b3a8;
+            --text-primary: #16151a; --text-secondary: #6a6870;
+            --accent: #34508c; --accent-hover: #2a4275;
+            --ui-section-bg: transparent; --ui-stage-bg: #e1dfd8; --ui-stage-check: #d7d4cb; --ui-danger: #b04a3f;
         }
         body.ui-skin-night {
-            --app-bg: #121317; --panel-bg: #18191e; --panel-border: #2a2c33;
-            --input-bg: #202228; --input-border: #353843;
-            --text-primary: #e8e6f0; --text-secondary: #9a98a6;
-            --accent: #8b7cf6; --accent-hover: #7a6aea;
-            --ui-section-bg: #1c1d23; --ui-stage-bg: #0e0f12; --ui-stage-check: #15161b; --ui-danger: #e5787a;
+            --app-bg: #11131b; --panel-bg: #171a24; --panel-border: #282c3a;
+            --input-bg: #1e2230; --input-border: #343a4c;
+            --text-primary: #e8e7ef; --text-secondary: #9a9aab;
+            --accent: #c76b8a; --accent-hover: #b65c7b;
+            --ui-section-bg: #1a1d28; --ui-stage-bg: #0d0f15; --ui-stage-check: #141722; --ui-danger: #f08c5a;
         }
 
         /* --- shared calm treatment for every redesigned skin --- */
@@ -2975,8 +2975,8 @@
             color: var(--text-primary);
             box-shadow: inset 0 -2px 0 var(--accent);
         }
-        /* The checkerboard is the editor's "this part is transparent" cue for a log whose
-           background is 없음, so redesigned skins keep it, just in their own tones. */
+        /* Redesigned skins keep the checkerboard stage, just in their own tones. A 없음 · 투명 log
+           swaps it for a plain white stage (`.log-bg-none`, last rule in this file). */
         body.ui-skin-custom .preview-wrapper,
         body.ui-skin-custom.light-mode .preview-wrapper {
             background-color: var(--ui-stage-bg);
@@ -3050,7 +3050,7 @@
             font-weight: 800;
             letter-spacing: 0.01em;
         }
-        /* Memorial-style index numbers: 01, 02, 03 … per tab, in the accent. */
+        /* Index numbers: 01, 02, 03 … per tab, in the accent. */
         body.ui-skin-editorial .tab-content { counter-reset: lc-section; }
         body.ui-skin-editorial .section-title::before {
             counter-increment: lc-section;
@@ -3098,21 +3098,27 @@
         body.ui-skin-paper .tab.active { box-shadow: inset 0 -3px 0 var(--accent); }
 
         /* --- 차분한 밤: pill controls, glassy cards, a soft accent glow --- */
-        body.ui-skin-night .app-header { background: rgba(21, 22, 26, 0.92); }
+        body.ui-skin-night .app-header { background: rgba(17, 19, 27, 0.92); }
         body.ui-skin-night .section {
             border-radius: 18px;
-            border-color: #2a2c35;
-            background: linear-gradient(180deg, #1e1f26 0%, #1a1b21 100%);
+            border-color: #282c3a;
+            background: linear-gradient(180deg, #1c1f2b 0%, #181b25 100%);
         }
         body.ui-skin-night .btn,
         body.ui-skin-night .list-folder-chip,
         body.ui-skin-night .btn-add-block,
         body.ui-skin-night .btn-add-rule { border-radius: 999px; }
-        body.ui-skin-night .tabs { gap: 6px; border-bottom: none; padding: 4px; border-radius: 999px; background: #1e1f26; }
+        body.ui-skin-night .tabs { gap: 6px; border-bottom: none; padding: 4px; border-radius: 999px; background: #1c1f2b; }
         body.ui-skin-night .tab { border-radius: 999px; }
-        body.ui-skin-night .tab.active { background: var(--accent); color: #ffffff; box-shadow: 0 0 18px rgba(139, 124, 246, 0.45); }
-        body.ui-skin-night .app-header .header-right .btn-primary { box-shadow: 0 0 22px rgba(139, 124, 246, 0.5); }
+        body.ui-skin-night .tab.active { background: var(--accent); color: #ffffff; box-shadow: 0 0 18px rgba(199, 107, 138, 0.45); }
+        body.ui-skin-night .app-header .header-right .btn-primary { box-shadow: 0 0 22px rgba(199, 107, 138, 0.5); }
         body.ui-skin-night .section-title::before { box-shadow: 0 0 10px var(--accent); }
+
+        /* 없음 · 투명 log: the stage turns plain white instead of the checkerboard (owner 2026-10-05:
+           a transparent log over the dark checkerboard was unreadable). Last in the file and
+           qualified by `body` so it outranks every stage rule above, skins and light mode included.
+           Only the stage changes — #log-preview stays transparent for the PNG and the export. */
+        body .preview-wrapper.log-bg-none:not(.html-mode) { background: #ffffff; }
 
     </style>
 </head>
@@ -4273,6 +4279,10 @@ USER: "반가워요."
             function applyBackground() {
                 const preview = document.getElementById('log-preview');
                 const bgType = document.getElementById('bg-type').value;
+                // The stage behind the log is editor chrome. A transparent log over the dark
+                // checkerboard was unreadable (owner 2026-10-05), so the stage turns plain white —
+                // the usual Arca page — while the log itself stays transparent for PNG and export.
+                document.querySelector('.preview-wrapper')?.classList.toggle('log-bg-none', bgType === 'none');
 
                 if (bgType === 'none') {
                     // Let whatever sits behind the log show through, so a dark page stays dark
@@ -9610,12 +9620,12 @@ USER: "반가워요."
     const UI_SKINS = Object.freeze([
         Object.freeze({ id: 'classic', name: '클래식', note: '지금까지의 디자인 · 🌙 다크/라이트 전환',
             swatches: Object.freeze(['#25262b', '#339af0', '#40c057']) }),
-        Object.freeze({ id: 'paper', name: '종이', note: '따뜻한 미색 바탕 + 초록 포인트 하나 · 조각로그 느낌',
-            swatches: Object.freeze(['#f3f1ed', '#ffffff', '#3d6b55']) }),
-        Object.freeze({ id: 'editorial', name: '에디토리얼', note: '먹색 글자 + 테라코타 · 모노 소제목 · 메모리얼 느낌',
-            swatches: Object.freeze(['#efebe3', '#171313', '#b35a4f']) }),
-        Object.freeze({ id: 'night', name: '차분한 밤', note: '어두운 바탕 + 라벤더 포인트 하나 · 버튼 색 정리',
-            swatches: Object.freeze(['#16171b', '#22232a', '#8b7cf6']) })
+        Object.freeze({ id: 'paper', name: '종이', note: '따뜻한 크림 바탕 + 초콜릿 포인트 하나',
+            swatches: Object.freeze(['#f6f1e9', '#ffffff', '#8a5a3c']) }),
+        Object.freeze({ id: 'editorial', name: '에디토리얼', note: '먹색 글자 + 잉크 블루 · 모노 소제목',
+            swatches: Object.freeze(['#ecebe6', '#16151a', '#34508c']) }),
+        Object.freeze({ id: 'night', name: '차분한 밤', note: '깊은 남색 바탕 + 로즈 포인트 하나 · 버튼 색 정리',
+            swatches: Object.freeze(['#11131b', '#1a1d28', '#c76b8a']) })
     ]);
 
     const DEFAULT_UI_SKIN = 'classic';
