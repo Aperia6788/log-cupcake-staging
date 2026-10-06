@@ -3230,6 +3230,7 @@
             <input type="file" id="import-preset-panel" accept=".json" style="display: none;">
             <button class="btn btn-secondary" onclick="document.getElementById('import-preset-panel').click()">📥
                 가져오기</button>
+            <button id="download-unreadable-storage" class="btn btn-secondary" hidden style="display: none;">⚠️ 손상된 저장 원본 내려받기</button>
         </div>
         <div class="preset-list" id="preset-list-panel">
             <!-- 프리셋 목록이 여기에 렌더링됨 -->
@@ -4077,6 +4078,37 @@ USER: "반가워요."
         };
     }
 
+    // Repairs only raw control characters inside JSON string literals, not JSON syntax.
+    // Escaping keeps every character's value; it cannot reconstruct the original image
+    // bytes, so callers must tell the user that an affected image may still be damaged.
+    function repairStringControlCharacters(text) {
+        const parts = [];
+        let inString = false;
+        let escaped = false;
+        let repaired = 0;
+        let start = 0;
+
+        for (let index = 0; index < text.length; index += 1) {
+            const character = text[index];
+            if (escaped) {
+                // A backslash escapes exactly one character. Invalid escape sequences
+                // remain invalid, including a control following an unmatched backslash.
+                escaped = false;
+            } else if (inString && character === '\\') {
+                escaped = true;
+            } else if (character === '"') {
+                inString = !inString;
+            } else if (inString && character.charCodeAt(0) < 0x20) {
+                parts.push(text.slice(start, index), '\\u' + character.charCodeAt(0).toString(16).padStart(4, '0'));
+                start = index + 1;
+                repaired += 1;
+            }
+        }
+        if (repaired === 0) return { text, repaired };
+        parts.push(text.slice(start));
+        return { text: parts.join(''), repaired };
+    }
+
     // This module owns the application's localStorage boundary: shape-guaranteed reads,
     // quota-aware writes, and removal. Every outcome is reported to the caller.
     //
@@ -4092,59 +4124,204 @@ USER: "반가워요."
             // These writes may contain an original-size cover. A failed attempt must not sacrifice
             // avatars from the current unsaved work merely to try storing another large image.
             const PRESERVE_EXISTING_DATA_KEYS = new Set(['logPresets', 'logPresentation']);
-
-            // Remembers the broken value already reported for each key. Startup and every
-            // later list operation repeat the same parse, and the user needs to hear about it
-            // once — but a DIFFERENT broken value is new information and is reported again.
+            const LIST_LABELS = new Map([
+                ['logPresets', '프리셋'], ['customThemes', '저장한 테마'],
+                ['logPresentation', '표시 설정'], ['logListOrganizer', '목록 폴더 설정']
+            ]);
+            // Static keys protect write-without-read callers and fresh tabs. Reads register
+            // additional list keys without changing the formats of scalar/cache values.
+            const JSON_LIST_KEYS = new Set(LIST_LABELS.keys());
             const reportedBrokenValues = new Map();
+            const reportedLockedWrites = new Set();
+            const UNREADABLE_BACKUP_MARKER = '.unreadable-';
+            // Keep every detected raw, including a second broken value for the same key.
+            // A failed backup must never be forgotten by a later read or list operation.
+            const unreadableValues = new Map();
 
-            // Single user-facing channel for this boundary, so tests can observe what the
-            // user was actually told and a future non-blocking toast replaces one function.
             function notify(message) {
                 alert(message);
             }
 
-            function reportBrokenValue(key, rawValue) {
-                if (reportedBrokenValues.get(key) === rawValue) return;
-                reportedBrokenValues.set(key, rawValue);
-                notify(`⚠️ 저장된 "${key}" 데이터를 읽을 수 없어 비어 있는 상태로 시작합니다.`);
+            function storageLabel(key) {
+                return LIST_LABELS.get(key) ?? key;
             }
 
-            // Always returns an array. Callers iterate the result, so neither a malformed
-            // string nor valid JSON of the wrong type may reach them as anything else.
+            function reportBrokenValue(key, rawValue, message) {
+                if (reportedBrokenValues.get(key) === rawValue) return;
+                reportedBrokenValues.set(key, rawValue);
+                notify(message);
+            }
+
+            function readUnreadableBackups() {
+                const backups = [];
+                try {
+                    for (let index = 0; index < localStorage.length; index += 1) {
+                        const backupKey = localStorage.key(index);
+                        const marker = backupKey?.lastIndexOf(UNREADABLE_BACKUP_MARKER) ?? -1;
+                        if (marker <= 0 || marker + UNREADABLE_BACKUP_MARKER.length === backupKey.length) continue;
+                        const raw = localStorage.getItem(backupKey);
+                        if (raw !== null) backups.push({ key: backupKey.slice(0, marker), raw, backupKey });
+                    }
+                } catch(ignored) {
+                    // Disabled storage still leaves the in-memory originals downloadable.
+                }
+                return backups;
+            }
+
+            function preserveUnreadableRaw(key, raw) {
+                const existing = readUnreadableBackups().find(copy => copy.key === key && copy.raw === raw);
+                if (existing) return existing.backupKey;
+                try {
+                    let timestamp = Date.now();
+                    let backupKey = `${key}${UNREADABLE_BACKUP_MARKER}${timestamp}`;
+                    // Two detections can share a millisecond. Never replace an older original.
+                    while (localStorage.getItem(backupKey) !== null) {
+                        timestamp += 1;
+                        backupKey = `${key}${UNREADABLE_BACKUP_MARKER}${timestamp}`;
+                    }
+                    // Not safeSetItem: preservation gets ONE attempt and may evict NOTHING.
+                    localStorage.setItem(backupKey, raw);
+                    return backupKey;
+                } catch(ignored) {
+                    return null;
+                }
+            }
+
+            function rememberedValues(key) {
+                if (!unreadableValues.has(key)) unreadableValues.set(key, new Map());
+                return unreadableValues.get(key);
+            }
+
+            function rememberUnreadableRaw(key, raw) {
+                const values = rememberedValues(key);
+                if (!values.has(raw)) {
+                    values.set(raw, { key, raw, backupKey: preserveUnreadableRaw(key, raw), downloaded: false, healingAttempted: false });
+                }
+                const record = values.get(raw);
+                // A removed/replaced backup is no longer proof that THIS raw is preserved.
+                if (record.backupKey && localStorage.getItem(record.backupKey) !== raw) record.backupKey = null;
+                return record;
+            }
+
+            function backupFailureNotice(key) {
+                return ` 원본을 따로 보관할 공간이 없어서, 프리셋 패널의 "손상된 저장 원본 내려받기"로 원본을 받기 전까지는 ${storageLabel(key)}에 새로 저장하지 않아요.`;
+            }
+
+            // Include durable copies on a fresh page too: after a successful save the main
+            // key is readable, but the user must still be able to download its old original.
+            function listUnreadableRaws() {
+                const records = readUnreadableBackups();
+                for (const values of unreadableValues.values()) {
+                    for (const { key, raw, downloaded } of values.values()) {
+                        if (!downloaded && !records.some(record => record.key === key && record.raw === raw)) {
+                            records.push({ key, raw, backupKey: null });
+                        }
+                    }
+                }
+                return records;
+            }
+
+            // Called only after the user confirms saving the download. The optional raw
+            // pins the exact original, including a backup discovered after a page reload.
+            function markUnreadableRawDownloaded(key, raw) {
+                const values = rememberedValues(key);
+                if (raw !== undefined && !values.has(raw)) {
+                    const backupKey = readUnreadableBackups().find(copy => copy.key === key && copy.raw === raw)?.backupKey ?? null;
+                    values.set(raw, { key, raw, backupKey, downloaded: true, healingAttempted: false });
+                }
+                for (const record of values.values()) {
+                    if (raw === undefined || record.raw === raw) record.downloaded = true;
+                }
+            }
+
+            // The download snapshot, NOT a fresh prefix sweep, defines cleanup authority.
+            // Another tab may have added or replaced a backup while confirmation was open.
+            function removeDownloadedUnreadableRaws(records) {
+                for (const { key, raw, backupKey } of records) {
+                    const record = unreadableValues.get(key)?.get(raw);
+                    if (!record?.downloaded || !backupKey?.startsWith(`${key}${UNREADABLE_BACKUP_MARKER}`)) continue;
+                    try {
+                        if (localStorage.getItem(backupKey) !== raw) continue;
+                        if (safeRemoveItem(backupKey) && record.backupKey === backupKey) record.backupKey = null;
+                    } catch(ignored) {
+                        // Retain failed removals in the downloadable list; never claim cleanup.
+                    }
+                }
+            }
+
+            function healRepairedRaw(key, raw, repairedText, record) {
+                if (!record.backupKey || record.healingAttempted) return;
+                record.healingAttempted = true;
+                try {
+                    // Healing is best effort, once, without eviction. A failed healing write
+                    // leaves the raw and its backup intact and still returns recovered data.
+                    if (localStorage.getItem(key) === raw) localStorage.setItem(key, repairedText);
+                } catch(ignored) {}
+            }
+
+            // One classification for reads AND write-time checks. Parseable repair can
+            // still have swallowed record boundaries, so it always preserves the raw first.
+            function readStoredArray(key, raw) {
+                let parsed;
+                let repair;
+                try {
+                    parsed = JSON.parse(raw);
+                } catch(e) {
+                    repair = repairStringControlCharacters(raw);
+                    if (repair.repaired > 0) {
+                        try { parsed = JSON.parse(repair.text); } catch(ignored) {}
+                    }
+                }
+                if (Array.isArray(parsed) && !repair) return parsed;
+
+                const record = rememberUnreadableRaw(key, raw);
+                const label = storageLabel(key);
+                if (Array.isArray(parsed)) {
+                    healRepairedRaw(key, raw, repair.text, record);
+                    const names = parsed.flatMap((item, index) => /\\u00[01][0-9a-f]/i.test(JSON.stringify(item))
+                        ? [item?.name || `#${index + 1}`] : []).join(', ');
+                    const where = record.backupKey ? ' 혹시 몰라 원본은 브라우저 안에 따로 보관했어요.' : backupFailureNotice(key);
+                    reportBrokenValue(key, raw, `⚠️ 저장된 ${label} 데이터에서 손상된 글자 ${repair.repaired}개를 찾아 고쳐서 불러왔어요. 손상된 항목: ${names}. 손상이 이미지에 있으면 그 이미지는 안 보일 수 있으니 다시 올려 주세요.${where}`);
+                    return parsed;
+                }
+                const where = record.backupKey
+                    ? ' 원본은 지우지 않고 브라우저 안에 따로 보관했어요. 프리셋 패널의 "손상된 저장 원본 내려받기"로 받을 수 있어요.'
+                    : backupFailureNotice(key);
+                reportBrokenValue(key, raw, `⚠️ 저장된 ${label} 데이터를 읽을 수 없어 기본 상태로 보여 드려요.${where}`);
+                return [];
+            }
+
+            // Always returns an array, preserving the existing absent/empty read behavior.
             function readJsonArray(key) {
+                JSON_LIST_KEYS.add(key);
                 let raw;
                 try {
                     raw = localStorage.getItem(key);
                 } catch(e) {
-                    // Reading can fail as well when storage is disabled entirely.
-                    // An unusable store is an empty store, not a crash on startup.
                     return [];
                 }
+                return raw === null || raw === '' ? [] : readStoredArray(key, raw);
+            }
 
-                // No saved data yet is the ordinary first-run state, not a fault to report.
-                if (raw === null || raw === '') return [];
-
-                let parsed;
-                try {
-                    parsed = JSON.parse(raw);
-                } catch(e) {
-                    reportBrokenValue(key, raw);
-                    return [];
+            function prepareListWrite(key) {
+                if (JSON_LIST_KEYS.has(key)) {
+                    const raw = localStorage.getItem(key);
+                    if (raw !== null) readStoredArray(key, raw);
                 }
-
-                if (!Array.isArray(parsed)) {
-                    reportBrokenValue(key, raw);
-                    return [];
+                const unreadable = unreadableValues.get(key);
+                if (!unreadable || ![...unreadable.values()].some(record => !record.backupKey && !record.downloaded)) return true;
+                if (!reportedLockedWrites.has(key)) {
+                    reportedLockedWrites.add(key);
+                    notify(`⚠️ 읽을 수 없는 기존 ${storageLabel(key)} 원본을 아직 보관하지 못해서 덮어쓰지 않았어요. 프리셋 패널의 "손상된 저장 원본 내려받기"로 먼저 원본을 받아 주세요.`);
                 }
-                return parsed;
+                return false;
             }
 
             // Returns whether the value is now stored. Callers must check before announcing
-            // success: a quota failure used to alert the user and then let the caller alert
-            // '프리셋이 저장되었습니다!' immediately afterwards, with nothing written.
+            // success, and each write inspects current bytes rather than a previous read.
             function safeSetItem(key, value, { evictCaches = !PRESERVE_EXISTING_DATA_KEYS.has(key) } = {}) {
                 try {
+                    if (!prepareListWrite(key)) return false;
                     localStorage.setItem(key, value);
                     return true;
                 } catch(e) {
@@ -4153,23 +4330,21 @@ USER: "반가워요."
                         // preset/presentation writes must never evict existing unsaved avatar data.
                         if (evictCaches) {
                             for (const cacheKey of DISPOSABLE_CACHE_KEYS) {
-                                try {
-                                    localStorage.removeItem(cacheKey);
-                                } catch(ignored) {}
+                                try { localStorage.removeItem(cacheKey); } catch(ignored) {}
                             }
                         }
                         try {
+                            if (!prepareListWrite(key)) return false;
                             localStorage.setItem(key, value);
                             return true;
                         } catch(retryError) {
-                            notify(evictCaches ? '⚠️ 저장 공간이 부족합니다. 불필요한 프리셋을 삭제해 주세요.'
-                                : '⚠️ 저장 공간이 부족해 저장하지 못했습니다. 기존 데이터는 유지됩니다.');
+                            const hint = readUnreadableBackups().length > 0
+                                ? ' 브라우저 안에 손상 원본 보관본이 공간을 차지하고 있어요. 프리셋 패널의 "손상된 저장 원본 내려받기"로 받은 뒤 지우면 공간이 생겨요.' : '';
+                            notify((evictCaches ? '⚠️ 저장 공간이 부족합니다. 불필요한 프리셋을 삭제해 주세요.'
+                                : '⚠️ 저장 공간이 부족해 저장하지 못했습니다. 기존 데이터는 유지됩니다.') + hint);
                             return false;
                         }
                     }
-                    // Anything else — SecurityError in private browsing, a disabled store —
-                    // used to be swallowed here with no message and no return value, so the
-                    // caller reported a save that never happened.
                     notify('⚠️ 저장에 실패했습니다. 브라우저의 저장소 설정을 확인해 주세요.');
                     return false;
                 }
@@ -5865,14 +6040,14 @@ USER: "반가워요."
                 const newName = prompt('새 테마 이름을 입력하세요:', theme.name);
                 if (!newName || newName === theme.name) return;
                 savedThemes[index].name = newName;
-                safeSetItem('customThemes', JSON.stringify(savedThemes));
+                if (!safeSetItem('customThemes', JSON.stringify(savedThemes))) return;
                 renderSavedThemes();
             }
 
             function deleteCustomTheme(index) {
                 let savedThemes = readJsonArray('customThemes');
                 savedThemes.splice(index, 1);
-                safeSetItem('customThemes', JSON.stringify(savedThemes));
+                if (!safeSetItem('customThemes', JSON.stringify(savedThemes))) return;
                 renderSavedThemes();
             }
 
@@ -8557,6 +8732,7 @@ USER: "반가워요."
             function renderPresetListPanel() {
                 const container = document.getElementById('preset-list-panel');
                 const savedPresets = readJsonArray('logPresets');
+                refreshUnreadableStorageDownload();
 
                 if (savedPresets.length === 0) {
                     container.innerHTML = '<div class="preset-empty">저장된 프리셋이 없습니다.<br>상단의 "저장" 버튼으로 현재 설정을 저장하세요.</div>';
@@ -8856,6 +9032,43 @@ USER: "반가워요."
                 }
 
                 renderPresetListPanel();
+            }
+
+            function refreshUnreadableStorageDownload() {
+                const button = document.getElementById('download-unreadable-storage');
+                if (!button) return;
+                button.hidden = listUnreadableRaws().length === 0;
+                // .btn defines display:inline-flex, which otherwise overrides native [hidden].
+                button.style.display = button.hidden ? 'none' : '';
+            }
+
+            function downloadUnreadableStorage() {
+                const records = listUnreadableRaws();
+                if (records.length === 0) return;
+                const now = new Date();
+                records.forEach(({ key, raw, backupKey }, index) => {
+                    // JSON escapes lone UTF-16 surrogates before Blob's UTF-8 conversion.
+                    // Raw text Blobs would silently replace them and lose the original.
+                    const envelope = JSON.stringify({
+                        type: 'log-cupcake-unreadable-original', version: 1,
+                        key, backupKey, savedAt: now.toISOString(), raw
+                    });
+                    const blob = new Blob([envelope], { type: 'application/json;charset=utf-8' });
+                    const link = document.createElement('a');
+                    link.download = `log-cupcake-${key}-손상원본-${now.getTime()}-${index}.json`;
+                    const url = URL.createObjectURL(blob);
+                    link.href = url;
+                    link.click();
+                    setTimeout(() => URL.revokeObjectURL(url), 0);
+                });
+                // A click only requests downloads: Save As can be cancelled or blocked.
+                if (!confirm('내려받은 파일이 기기에 저장된 걸 확인했나요? 확인을 누르면 이 원본 위에 새로 저장할 수 있게 돼요.')) return;
+                for (const { key, raw } of records) markUnreadableRawDownloaded(key, raw);
+                if (records.some(record => record.backupKey)
+                    && confirm('브라우저 안에 따로 보관해 둔 손상 원본 사본도 지울까요? 방금 내려받은 파일이 있으면 지워도 안전해요.')) {
+                    removeDownloadedUnreadableRaws(records);
+                }
+                refreshUnreadableStorageDownload();
             }
 
             function exportPreset() {
@@ -9937,6 +10150,9 @@ AI: 빙그레 웃는다`;
 
                 // Last-used reading settings win over the remembered preset at startup only.
                 initializePresentation();
+                // Presentation/organizer reads can also detect an unreadable stored list.
+                refreshUnreadableStorageDownload();
+                document.getElementById('download-unreadable-storage').addEventListener('click', downloadUnreadableStorage);
 
                 // Recall saved mode settings
                 const savedMode = localStorage.getItem('logmaker-mode');
@@ -9963,7 +10179,9 @@ AI: 빙그레 웃는다`;
                             const savedPresets = readJsonArray('logPresets');
                             const firstImportedIndex = savedPresets.length;
                             savedPresets.push(...importedPresets);
-                            safeSetItem('logPresets', JSON.stringify(savedPresets));
+                            if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return;
+                            // The library is already saved; an advisory selection failure must not
+                            // leave the import looking unsuccessful and invite a duplicate import.
                             safeSetItem('lastPresetIndex', firstImportedIndex);
                             renderPresetListPanel();
                             applyPresetData(importedPresets[0]);
@@ -10054,7 +10272,7 @@ AI: 빙그레 웃는다`;
                 const newName = prompt('새 프리셋 이름을 입력하세요:', preset.name);
                 if (!newName || newName === preset.name) return;
                 savedPresets[index].name = newName;
-                safeSetItem('logPresets', JSON.stringify(savedPresets));
+                if (!safeSetItem('logPresets', JSON.stringify(savedPresets))) return;
                 renderPresetListPanel();
             }
 
