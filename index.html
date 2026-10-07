@@ -4041,10 +4041,10 @@ USER: "반가워요."
             // Folding used to be an Arca-export-only shape, which left the preview showing every
             // block run together with no heading at all. Both renderers now read the same decision
             // so the preview matches what the reader actually gets.
-            // Gated on the same "more than one block" rule as showLabel, and for the same reason: a
-            // summary bar IS a heading, and a lone block is the ordinary case, so folding it would
-            // stamp "블록 1" across nearly every log and hide the whole thing behind a pointless click.
-            fold: Boolean(isFolded) && blockCount > 1,
+            // The checkbox alone decides, whatever the block count: a lone block folds too, because
+            // the author who ticked 블록 접기 expects the copy to arrive collapsed (owner 2026-10-07,
+            // reversing the earlier "more than one block" gate that silently ignored the box).
+            fold: Boolean(isFolded),
             // PREVIEW-ONLY default for a block appearing on screen for the first time: the first one
             // opens so the author sees content without clicking. A block already on screen keeps the
             // state the author left it in (resolveFoldOpen). The Arca export never reads this — the
