@@ -1412,23 +1412,6 @@
             border-radius: 8px;
         }
 
-        /* Cover with names laid over its bottom edge (preview + saved PNG; the Arca export rebuilds or
-           captures this look where Arca allows it — see cover-caption.js). One grid cell holds both: a cover shorter
-           than its caption grows to fit instead of the panel escaping above the log. */
-        .log-cover-overlay { display: grid; }
-        .log-cover-overlay > .log-cover-image,
-        .log-cover-overlay > .log-cover-caption { grid-area: 1 / 1; min-width: 0; }
-        .log-cover-overlay > .log-cover-image { align-self: start; line-height: 0; }
-        .log-cover-overlay > .log-cover-caption {
-            align-self: end;
-            margin: 0.8em;
-            padding: 0.7em 0.6em;
-            border-radius: 12px;
-            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.18);
-            line-height: 1.5;
-            text-align: center;
-        }
-
         #log-preview.display-simple .simple-line {
             margin: 12px 0;
             padding: 0;
@@ -3619,14 +3602,10 @@ USER: "반가워요."
                             <p id="cover-image-status" class="presentation-hint" role="status"></p>
                             <label class="presentation-check">
                                 <input type="checkbox" id="cover-caption" checked>
-                                <span>표지 아래쪽에 봇·페르소나 이름과 소개 겹쳐 올리기</span>
+                                <span>표지 바로 아래에 봇·페르소나 이름과 소개 넣기</span>
                             </label>
-                            <!-- Measured on real Arca saves (2026-10-02, 2026-10-07): nothing can overlap an
-                                 article <img>, but text inside a CSS background survives when the image is on
-                                 Arca's own CDN. Placement rules: src/js/modules/arca-cover.js. -->
-                            <p class="presentation-hint" id="cover-caption-arca-note">아카라이브에서도 표지 위에 겹쳐 들어가요. 아카라이브에 올린 이미지 주소(ac.arca.live)는 ✨ 복사·HTML 복사 모두 글자 그대로 겹치고(주소는 약 1시간 안에 써 주세요), 업로드한 표지는 ✨ 복사 때 이름까지 한 장의 그림으로 합쳐요. 업로드한 표지를 HTML 복사로 넣거나, 그림으로 합칠 수 없는 외부 주소는 표지 바로 아래 칸으로 들어가요.</p>
                             <button type="button" id="cover-image-remove" class="btn btn-secondary">표지 이미지 제거</button>
-                            <p class="presentation-hint">원본 비율로 표시합니다. 이름·소개는 이름을 바꿨거나 사진·소개가 있는 쪽만 반투명 칸에 올라가고(기본 이름 AI·USER 그대로면 안 나와요), 프로필 사진은 표지가 대신합니다. 2분할로 돌아가면 기존 프로필 사진과 소개가 다시 나타납니다.</p>
+                            <p class="presentation-hint">원본 비율로 표시합니다. 이름·소개는 이름을 바꿨거나 사진·소개가 있는 쪽만 표지 아래 칸에 들어가요(기본 이름 AI·USER 그대로면 안 나와요). 미리보기·이미지 저장·아카라이브 모두 같은 모양이에요. 프로필 사진은 표지가 대신합니다. 2분할로 돌아가면 기존 프로필 사진과 소개가 다시 나타납니다.</p>
                         </div>
                     </div>
                     <div class="section">
@@ -4000,28 +3979,6 @@ USER: "반가워요."
             cells.push({ role: 'persona', name: userName, bio: profileCardModel.persona.showBio ? personaBio : '' });
         }
         return { show: cells.length > 0, cells };
-    }
-
-    // See-through enough to keep the cover visible behind the text, opaque enough that any image
-    // region still reads as the panel's colour.
-    const COVER_CAPTION_SURFACE_ALPHA = 0.78;
-    const SIX_DIGIT_HEX$1 = /^#[0-9a-f]{6}$/i;
-    const FALLBACK_SURFACE = '#ffffff';
-
-    function toRgba(hex, alpha) {
-        const source = SIX_DIGIT_HEX$1.test(hex) ? hex : FALLBACK_SURFACE;
-        const channel = offset => parseInt(source.slice(offset, offset + 2), 16);
-        return `rgba(${channel(1)}, ${channel(3)}, ${channel(5)}, ${alpha})`;
-    }
-
-    // The profile name/bio colours were picked to read on the LOG background, so the panel is made of
-    // that background. A transparent log has none to borrow; its text colour is the one stated intent,
-    // so the panel takes the contrasting side of it — the same reasoning as resolveLogHeadingColor.
-    function resolveCoverCaptionSurface({ backgroundType, solidColor, gradientStartColor, textColor }) {
-        let base;
-        if (backgroundType === 'none') base = SIX_DIGIT_HEX$1.test(textColor) ? getContrastColor(textColor) : FALLBACK_SURFACE;
-        else base = backgroundType === 'gradient' ? gradientStartColor : solidColor;
-        return toRgba(base, COVER_CAPTION_SURFACE_ALPHA);
     }
 
     function createBlockLabelModel({
@@ -7459,92 +7416,6 @@ USER: "반가워요."
         return images.filter(image => image.blockNumber === blockNumber && image.position === slot);
     }
 
-    // Where a captioned single cover goes in the Arca export. DOM-free: the app measures and captures,
-    // this module only decides.
-    //
-    // Measured on real Arca save round trips (2026-10-02, 2026-10-07):
-    // - Arca styles every article <img> `position:relative` and its save strips `position`, `z-index`,
-    //   `opacity`, `transform`, `translate`/`scale`/`rotate`, `filter`, `isolation`, `will-change`,
-    //   `clip-path`, `contain`, `mix-blend-mode`, `backdrop-filter` and `grid-area`. Nothing that
-    //   survives can paint a sibling above an <img>, so text can never overlap an image ELEMENT.
-    // - A CSS `background-image` survives, and text inside that element paints over it — but only when
-    //   the URL is on Arca's own image CDN (the save re-signs it). An external or `data:` URL makes the
-    //   save drop the element's whole `style` attribute.
-    // So a cover hosted on Arca can carry live caption text; any other cover gets the caption baked
-    // into one picture (an <img>, which Arca's editor uploads on paste), and when even that is
-    // impossible the caption sits under the cover.
-    const ARCA_COVER_PLACEMENT = Object.freeze({
-        PLAIN: 'plain',
-        OVERLAY: 'overlay',
-        BAKED: 'baked',
-        UNDER: 'under'
-    });
-
-    const ARCA_IMAGE_HOST = 'ac.arca.live';
-    // The "open original" link of an Arca image. Its path and signature are the image's own, but it
-    // does not load outside Arca (a 200×200 placeholder), so it is served from the display host.
-    const ARCA_ORIGINAL_HOST = 'ac-o.arca.live';
-    const ARCA_ORIGINAL_MARKER = 'type';
-
-    // The URL to put in `background-image`, or '' when the source is not an Arca-hosted image.
-    // The result is safe inside `url('…')` in an HTML attribute: characters that could close the CSS
-    // string or the url() are percent-encoded.
-    function toArcaBackgroundImageUrl(source) {
-        if (typeof source !== 'string') return '';
-        const trimmed = source.trim();
-        let url;
-        try {
-            url = new URL(trimmed.startsWith('//') ? `https:${trimmed}` : trimmed);
-        } catch {
-            return '';
-        }
-        if (url.protocol !== 'https:' && url.protocol !== 'http:') return '';
-        if (url.hostname === ARCA_ORIGINAL_HOST) {
-            url.hostname = ARCA_IMAGE_HOST;
-            url.searchParams.delete(ARCA_ORIGINAL_MARKER);
-        }
-        if (url.hostname !== ARCA_IMAGE_HOST) return '';
-        url.protocol = 'https:';
-        return url.href.replace(/['"()\\\s]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
-    }
-
-    // Arca signs every image address for about an hour (`expires` = Unix seconds; measured
-    // 2026-10-07: now + ~3600 s) and re-signs each one whenever a post is rendered, so a published
-    // cover never expires — but an address copied out of a post stops loading in this app an hour
-    // later. Returns whether `source` is an Arca image address whose signature has already lapsed.
-    function isExpiredArcaImageUrl(source, nowSeconds) {
-        const url = toArcaBackgroundImageUrl(source);
-        if (!url) return false;
-        const expires = Number(new URL(url).searchParams.get('expires'));
-        return Number.isFinite(expires) && expires > 0 && expires <= nowSeconds;
-    }
-
-    // The address to display a cover from, in the preview and in every export: an Arca open-original
-    // link only shows a placeholder outside Arca, so any Arca image is served from the display host.
-    function resolveCoverImageSource(source) {
-        return toArcaBackgroundImageUrl(source) || source;
-    }
-
-    function isUsableSize(size) {
-        return Boolean(size) && Number.isFinite(size.width) && Number.isFinite(size.height)
-            && size.width > 0 && size.height > 0;
-    }
-
-    // `backgroundUrl` comes from toArcaBackgroundImageUrl; `coverSize` is the image's natural size
-    // (a background has no intrinsic height, so the box needs the ratio); `bakedSource` is the cover
-    // with its caption captured as one picture, '' when no capture exists.
-    function resolveArcaCoverPlacement({ captionShown, backgroundUrl, coverSize, bakedSource }) {
-        if (!captionShown) return ARCA_COVER_PLACEMENT.PLAIN;
-        if (backgroundUrl && isUsableSize(coverSize)) return ARCA_COVER_PLACEMENT.OVERLAY;
-        if (bakedSource) return ARCA_COVER_PLACEMENT.BAKED;
-        return ARCA_COVER_PLACEMENT.UNDER;
-    }
-
-    // `aspect-ratio` value for the background box, in whole pixels.
-    function formatCoverAspectRatio(size) {
-        return `${Math.round(size.width)}/${Math.round(size.height)}`;
-    }
-
     // Stable IDs are persisted, never arbitrary CSS. Both renderers resolve the same catalogue.
     // Never rename or drop an ID: a saved preset stores the ID, not the family string.
     const FONT_FAMILIES = Object.freeze({
@@ -7660,11 +7531,9 @@ USER: "반가워요."
         return Object.hasOwn(FONT_FAMILIES, presentation.titleFont) ? FONT_FAMILIES[presentation.titleFont] : '';
     }
 
-    // The stored address stays as typed; what is displayed and exported goes through
-    // resolveCoverImageSource (an Arca open-original link shows only a placeholder outside Arca).
     function getCoverSource(presentation) {
         return presentation.profileLayout === 'cover'
-            ? resolveCoverImageSource(presentation.coverImageUrl || presentation.coverImageData) : '';
+            ? presentation.coverImageUrl || presentation.coverImageData : '';
     }
 
     // This is a semantic reading model, not either output dialect's HTML/CSS.
@@ -7763,17 +7632,6 @@ USER: "반가워요."
         safeSetItem(PRESENTATION_STORAGE_KEY, JSON.stringify([collectPresentation()]), { evictCaches: false });
     }
 
-    function describeCoverSource(settings) {
-        if (settings.coverImageUrl) {
-            if (isExpiredArcaImageUrl(settings.coverImageUrl, Date.now() / 1000)) {
-                return '이 아카라이브 이미지 주소는 만료됐어요(약 1시간 유효). 글에서 이미지 주소를 다시 복사해 넣어 주세요.';
-            }
-            return toArcaBackgroundImageUrl(settings.coverImageUrl)
-                ? '아카라이브 이미지 주소 사용 중 — 약 1시간 안에 복사해 붙여넣어 주세요.' : '이미지 주소 사용 중';
-        }
-        return coverImageData ? '업로드한 이미지 사용 중' : '표지 이미지를 선택해 주세요.';
-    }
-
     function updatePresentationView() {
         const settings = collectPresentation();
         const preview = document.getElementById('log-preview');
@@ -7789,7 +7647,7 @@ USER: "반가워요."
         const coverOptions = document.getElementById('cover-image-options');
         if (coverOptions) coverOptions.hidden = settings.profileLayout !== 'cover';
         const status = document.getElementById('cover-image-status');
-        if (status) status.textContent = describeCoverSource(settings);
+        if (status) status.textContent = settings.coverImageUrl ? '이미지 주소 사용 중' : coverImageData ? '업로드한 이미지 사용 중' : '표지 이미지를 선택해 주세요.';
     }
 
     function applyPresentation(value, { persist = true } = {}) {
@@ -7909,176 +7767,13 @@ USER: "반가워요."
             + `<tr>${cells}</tr></table>`;
     }
 
-    // Preview: the whole cover block. Layout lives in styles.css (.log-cover-overlay); only the
-    // computed glass colour is inline. Returns '' when there is nothing to caption.
-    function renderPreviewCoverOverlay(imageHtml, model, { surface, colors }) {
-        if (!model.show) return '';
-        return `<div class="log-cover log-cover-overlay"><div class="log-cover-image">${imageHtml}</div>`
-            + `<div class="log-cover-caption" style="background:${surface};">${renderCaptionTable(model, colors)}</div></div>`;
-    }
-
-    // Arca UNDER: the caption row that follows the cover. Inline styles only and no class attributes
-    // (smoke-display pins that for the whole export). The faint neutral plate matches the split
-    // profile cards, which read on any log background.
-    function renderArcaCoverCaption(model, { colors }) {
+    // The caption row that follows the cover. Inline styles only and no class attributes (the Arca
+    // export carries none; smoke-display pins it). The faint neutral plate matches the split profile
+    // cards, which read on any log background. Returns '' when there is nothing to caption.
+    function renderCoverCaption(model, { colors }) {
         if (!model.show) return '';
         return '<div style="margin:10px 0 0;padding:12px 8px;border-radius:14px;background:rgba(128,128,128,0.08);text-align:center;line-height:1.5;">'
             + `${renderCaptionTable(model, colors)}</div>`;
-    }
-
-    // Arca OVERLAY: the preview's look rebuilt from properties Arca's save keeps (round trip
-    // 2026-10-07). The box takes the cover's own ratio, so `cover` sizing shows the whole image; a
-    // caption taller than the image grows the box rather than overflowing it, like the preview grid.
-    function renderArcaCoverOverlay(model, { backgroundUrl, coverSize, surface, colors }) {
-        if (!model.show) return '';
-        const box = `background-image:url('${escapeHtmlAttribute(backgroundUrl)}');background-size:cover;background-position:center;background-repeat:no-repeat;`
-            + `aspect-ratio:${formatCoverAspectRatio(coverSize)};width:100%;border-radius:8px;display:flex;flex-direction:column;justify-content:flex-end;box-sizing:border-box;`;
-        const panel = `margin:0.8em;padding:0.7em 0.6em;border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,0.18);line-height:1.5;text-align:center;background:${surface};`;
-        return `<div style="${box}"><div style="${panel}">${renderCaptionTable(model, colors)}</div></div>`;
-    }
-
-    // The browser-side ingredients the Arca export needs for a captioned cover: the cover's natural
-
-    // A cover that has not loaded by then is treated as unmeasurable rather than holding the copy.
-    const IMAGE_LOAD_TIMEOUT_MS = 8000;
-    // Captured at least this dense so the caption text stays crisp, at most this dense so a large
-    // cover does not become a multi-megabyte paste.
-    const MIN_CAPTURE_SCALE = 2;
-    const MAX_CAPTURE_SCALE = 3;
-    // Longest side of the captured picture: a very tall upload must not allocate a canvas the
-    // browser refuses (or a paste Arca rejects). The scale shrinks to fit; text stays proportional.
-    const MAX_CAPTURE_EDGE_PX = 4096;
-    const JPEG_QUALITY = 0.92;
-    const PREVIEW_ID = 'log-preview';
-    const PREVIEW_COVER_SELECTOR = `#${PREVIEW_ID} .log-cover-overlay`;
-    const VALID_CAPTURE = /^data:image\/(?:png|jpeg);base64,./;
-
-    // `source` is the cover the ingredients belong to: generateArcaHTML ignores them when the cover
-    // changed while they were being prepared, so an export never mixes two states.
-    const NO_COVER_EXPORT = Object.freeze({ source: '', backgroundUrl: '', coverSize: null, bakedSource: '' });
-
-    function loadImage(source, { crossOrigin = false } = {}) {
-        if (typeof Image !== 'function') return Promise.resolve(null);
-        return new Promise(resolve => {
-            const image = new Image();
-            const timer = setTimeout(() => resolve(null), IMAGE_LOAD_TIMEOUT_MS);
-            const finish = value => { clearTimeout(timer); resolve(value); };
-            image.onload = () => finish(image);
-            image.onerror = () => finish(null);
-            if (crossOrigin) image.crossOrigin = 'anonymous';
-            image.src = source;
-        });
-    }
-
-    // The preview usually shows the cover already; reading it costs no request and no wait.
-    async function measureImage(source) {
-        const shown = document.querySelector(`#${PREVIEW_ID} .log-cover img`);
-        const image = shown && shown.getAttribute('src') === source && shown.complete && shown.naturalWidth > 0
-            ? shown : await loadImage(source);
-        return image && image.naturalWidth > 0 && image.naturalHeight > 0
-            ? { width: image.naturalWidth, height: image.naturalHeight } : null;
-    }
-
-    // A capture can only be encoded when the canvas may read the cover: an uploaded (data:) cover
-    // always, a web address only when its server allows cross-origin reads. Without that,
-    // html2canvas silently leaves the image out and the "baked" picture would be a caption on nothing.
-    async function isCanvasReadable(source) {
-        if (source.startsWith('data:image/')) return true;
-        return Boolean(await loadImage(source, { crossOrigin: true }));
-    }
-
-    // Both captures of the preview (📷 image save and the baked cover) share this clone fix:
-    // html2canvas painted the overlaid caption's glass AFTER its text (an atomic inline/grid-item
-    // paint-order gap), so the names came out washed out while browsers render them correctly. A
-    // stacking context in the clone restores background-then-content; the live preview stays untouched.
-    function liftCoverCaptionsForCapture(clonedDoc) {
-        clonedDoc.querySelectorAll(`#${PREVIEW_ID} .log-cover-caption`).forEach(panel => {
-            panel.style.position = 'relative';
-            panel.style.zIndex = '1';
-        });
-    }
-
-    // Alpha-capable uploads keep PNG; a photo stays JPEG instead of inflating several-fold as PNG.
-    // (A JPEG's square corners never show: the pasted image keeps its 8px radius on Arca.)
-    function captureMimeType(source) {
-        return /^data:image\/jpe?g[;,]/i.test(source) ? 'image/jpeg' : 'image/png';
-    }
-
-    // The phone layout hides the whole preview while settings are shown, and the HTML view hides the
-    // rendered preview; a hidden element captures as an empty canvas. Lay it out off screen for the
-    // capture, the way 📷 image save does, at the width it has when visible on this screen.
-    async function withPreviewLaidOut(run) {
-        const preview = document.getElementById(PREVIEW_ID);
-        if (!preview || preview.getBoundingClientRect().width > 0) return run();
-        const holder = document.createElement('div');
-        holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${document.documentElement.clientWidth}px;`;
-        const parent = preview.parentNode;
-        const nextSibling = preview.nextSibling;
-        document.body.appendChild(holder);
-        holder.appendChild(preview);
-        try {
-            return await run();
-        } finally {
-            parent.insertBefore(preview, nextSibling);
-            holder.remove();
-        }
-    }
-
-    async function bakeCoverCaption(source) {
-        if (typeof html2canvas !== 'function' || !document.querySelector(PREVIEW_COVER_SELECTOR)) return '';
-        if (!await isCanvasReadable(source)) return '';
-        await whenFontStylesheetsSettled();
-        await document.fonts?.ready;
-        return withPreviewLaidOut(async () => {
-            // Looked up after every await: a re-render in between replaces the preview's children.
-            const element = document.querySelector(PREVIEW_COVER_SELECTOR);
-            const coverImage = element?.querySelector('img');
-            const box = element?.getBoundingClientRect();
-            if (!box || box.width <= 0 || box.height <= 0 || coverImage?.getAttribute('src') !== source) return '';
-            const naturalScale = coverImage.naturalWidth ? coverImage.naturalWidth / box.width : 0;
-            const scale = Math.min(MAX_CAPTURE_SCALE, Math.max(MIN_CAPTURE_SCALE, naturalScale),
-                MAX_CAPTURE_EDGE_PX / Math.max(box.width, box.height));
-            const mimeType = captureMimeType(source);
-            const canvas = await html2canvas(element, {
-                scale,
-                useCORS: true,
-                allowTaint: false,
-                backgroundColor: mimeType === 'image/png' ? null : '#ffffff',
-                logging: false,
-                onclone: liftCoverCaptionsForCapture
-            });
-            if (!(canvas?.width > 0 && canvas?.height > 0)) return '';
-            const encoded = canvas.toDataURL(mimeType, JPEG_QUALITY);
-            // A canvas the browser could not encode comes back as "data:," — never paste that.
-            return VALID_CAPTURE.test(encoded) ? encoded : '';
-        });
-    }
-
-    // Never rejects: a failed measurement or capture only moves the caption under the cover.
-    // `allowBaked` is false for the HTML-mode copy, where Arca drops every data: image on save.
-    async function prepareArcaCover({ allowBaked }) {
-        try {
-            const presentation = collectPresentation();
-            const source = getCoverSource(presentation);
-            // No caption, nothing to place: the plain cover needs neither a size nor a capture.
-            if (!source || !presentation.coverCaption) return { ...NO_COVER_EXPORT, source };
-            const backgroundUrl = toArcaBackgroundImageUrl(source);
-            const coverSize = backgroundUrl ? await measureImage(backgroundUrl) : null;
-            if (backgroundUrl && coverSize) return { source, backgroundUrl, coverSize, bakedSource: '' };
-            const bakedSource = allowBaked ? await bakeCoverCaption(source) : '';
-            return { source, backgroundUrl, coverSize, bakedSource };
-        } catch (error) {
-            console.warn('Cover caption could not be prepared for Arca; it goes under the cover.', error);
-            return NO_COVER_EXPORT;
-        }
-    }
-
-    // The copy alert's extra line when an Arca-hosted cover could not be loaded (its address is
-    // signed for about an hour), so the names went under the cover instead of onto it.
-    function describeCoverExportFallback(coverExport) {
-        return coverExport.backgroundUrl && !coverExport.coverSize
-            ? '\n\n아카라이브 이미지 주소를 불러오지 못해 이름·소개를 표지 아래 칸에 넣었어요. 주소는 약 1시간 뒤 만료되니, 글에서 이미지 주소를 다시 복사해 넣고 복사해 주세요.'
-            : '';
     }
 
     // ========== Added vintage theme speech bubble wave background ==========
@@ -8308,22 +8003,16 @@ USER: "반가워요."
                 const coverSource = getCoverSource(presentation);
                 if (coverSource) {
                     const coverImage = `<img src="${escapeHtmlAttribute(coverSource)}" alt="표지 이미지">`;
-                    const overlay = renderPreviewCoverOverlay(coverImage, createCoverCaptionModel({
+                    // Under the cover, never over it: the same row the Arca export carries.
+                    const caption = renderCoverCaption(createCoverCaptionModel({
                         enabled: presentation.coverCaption, profileCardModel, aiName, userName, botBio, personaBio
                     }), {
-                        surface: resolveCoverCaptionSurface({
-                            backgroundType: document.getElementById('bg-type').value,
-                            solidColor: document.getElementById('bg-solid-color').value,
-                            gradientStartColor: document.getElementById('gradient-start').value,
-                            textColor: document.getElementById('color-text').value
-                        }),
                         colors: {
                             bot: { name: pvProfileNameColor, bio: pvProfileBioColor },
                             persona: { name: pvProfileNamePersonaColor, bio: pvProfileBioPersonaColor }
                         }
                     });
-                    // Without a caption the markup stays exactly what every earlier build emitted.
-                    html += overlay || `<div class="log-cover">${coverImage}</div>`;
+                    html += `<div class="log-cover">${coverImage}${caption}</div>`;
                 }
                 const titleFont = resolveTitleFontFamily(presentation);
                 const titleFontStyle = titleFont ? `;font-family:${titleFont}` : '';
@@ -8779,10 +8468,6 @@ USER: "반가워요."
                             fold.open = true;
                             fold.setAttribute('open', '');
                         });
-
-                        // The caption's glass must paint under its text in the capture too (shared
-                        // with the baked Arca cover). smoke-display reads the saved PNG's pixels.
-                        liftCoverCaptionsForCapture(clonedDoc);
 
                         // Copy SVG filter elements from cloned document
                         const originalSvg = document.querySelector('svg[style*="position:absolute"]');
@@ -9484,22 +9169,15 @@ USER: "반가워요."
             // ========== Copy style (direct paste) ==========
             // Resolves to whether the export reached the clipboard by any route.
             async function copyStyled() {
-                // Checked before preparing, so a browser without rich copy never runs a cover capture.
-                if (typeof ClipboardItem !== 'function') return copyArcaHTML();
-                let coverNotice = '';
+                const html = generateArcaHTML();
+
                 try {
-                    // Rich copy, so a paste into the Arca editor keeps its styling. The payload is a
-                    // promise: a captioned cover may first be captured as one picture, and handing the
-                    // clipboard a pending item keeps the click's permission while that runs.
-                    // prepareArcaCover never rejects, so a failed capture still copies (caption under).
-                    const prepared = prepareArcaCover({ allowBaked: true });
-                    const htmlReady = prepared.then(generateArcaHTML);
+                    // Rich copy, so a paste into the Arca editor keeps its styling.
                     const clipboardItem = new ClipboardItem({
-                        'text/html': htmlReady.then(html => new Blob([html], { type: 'text/html' })),
-                        'text/plain': htmlReady.then(html => new Blob([html], { type: 'text/plain' }))
+                        'text/html': new Blob([html], { type: 'text/html' }),
+                        'text/plain': new Blob([html], { type: 'text/plain' })
                     });
                     await navigator.clipboard.write([clipboardItem]);
-                    coverNotice = describeCoverExportFallback(await prepared);
                 } catch(e) {
                     // Either this browser has no ClipboardItem, or the rich write was refused.
                     // Both are supported paths, and the plain fallback must be AWAITED: the old
@@ -9510,16 +9188,14 @@ USER: "반가워요."
 
                 // Announced outside the try on purpose. Inside it, a throwing alert would be
                 // caught as a copy failure and trigger a redundant second copy.
-                alert('복사 완료! 🧁\n아카라이브의 일반 편집기에 Ctrl+V로 붙여넣으세요.\n이미지가 있으면 자동 업로드가 끝나고 모두 표시된 뒤 글을 저장하세요.' + coverNotice);
+                alert('복사 완료! 🧁\n아카라이브의 일반 편집기에 Ctrl+V로 붙여넣으세요.\n이미지가 있으면 자동 업로드가 끝나고 모두 표시된 뒤 글을 저장하세요.');
                 return true;
             }
 
             // ========== Copy HTML for Arca Live ==========
             // Resolves to whether the export reached the clipboard.
             async function copyArcaHTML() {
-                // HTML mode: Arca drops data: images on save, so a captured cover picture would vanish.
-                const coverExport = await prepareArcaCover({ allowBaked: false });
-                const html = generateArcaHTML(coverExport);
+                const html = generateArcaHTML();
 
                 if (!await writeClipboardText(html)) {
                     alert('클립보드 복사에 실패했습니다.\n브라우저의 클립보드 권한을 확인해 주세요.');
@@ -9529,12 +9205,11 @@ USER: "반가워요."
                 const imageNotice = /<img\b[^>]*\bsrc="data:image\//i.test(html)
                     ? '\n\n업로드한 이미지가 포함되어 있어요. HTML 모드로 넣으면 아카라이브 저장 시 이미지가 사라집니다.\n이미지도 올리려면 이 앱의 ✨ 복사 버튼으로 다시 복사한 뒤 일반 편집기에 붙여넣으세요. 자동 업로드가 끝난 뒤 저장하세요.\n✨ 복사를 지원하지 않는 브라우저에서는 다른 브라우저로 복사하거나 아카라이브에서 이미지를 직접 첨부해 주세요.'
                     : '';
-                alert('아카라이브용 HTML이 복사되었습니다!' + imageNotice + describeCoverExportFallback(coverExport) + '\n\nHTML 붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
+                alert('아카라이브용 HTML이 복사되었습니다!' + imageNotice + '\n\nHTML 붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
                 return true;
             }
 
-            // `coverExport` carries what prepareArcaCover measured or captured for a captioned cover.
-            function generateArcaHTML(coverExport = NO_COVER_EXPORT) {
+            function generateArcaHTML() {
                 const presentation = collectPresentation();
                 const simple = presentation.mode === 'simple';
                 // Get Color
@@ -9665,43 +9340,18 @@ USER: "반가워요."
                 html += `<div style="${bgStyle}${frameCSS}padding:24px;border-radius:${borderRadius}px;font-family:${FONT_FAMILIES[presentation.fontFamily]};font-size:${fontSize}px;line-height:${document.getElementById('style-line-height').value || '1.7'};color:${textColor} !important;width:${arcaWidth}%;max-width:100%;margin:0 auto;text-align:left;word-break:break-word;overflow-wrap:break-word;box-sizing:border-box;">`;
                 const coverSource = getCoverSource(presentation);
                 if (coverSource) {
-                    const coverImageOf = src => `<img src="${escapeHtmlAttribute(src)}" alt="표지 이미지" style="display:block;width:100%;max-width:100%;height:auto;border-radius:8px;margin:0 auto;">`;
-                    const captionModel = createCoverCaptionModel({
+                    const coverImage = `<img src="${escapeHtmlAttribute(coverSource)}" alt="표지 이미지" style="display:block;width:100%;max-width:100%;height:auto;border-radius:8px;margin:0 auto;">`;
+                    // Under the cover, not over it: Arca paints its article images positioned and strips
+                    // every property that could lift a panel above one (see cover-caption.js).
+                    const caption = renderCoverCaption(createCoverCaptionModel({
                         enabled: presentation.coverCaption, profileCardModel, aiName, userName, botBio, personaBio
+                    }), {
+                        colors: {
+                            bot: { name: profileNameColor, bio: profileBioColor },
+                            persona: { name: profileNamePersonaColor, bio: profileBioPersonaColor }
+                        }
                     });
-                    const captionColors = {
-                        bot: { name: profileNameColor, bio: profileBioColor },
-                        persona: { name: profileNamePersonaColor, bio: profileBioPersonaColor }
-                    };
-                    // Which placement Arca's save can keep is decided in arca-cover.js.
-                    // Ingredients prepared for a different cover (changed while they were measured or
-                    // captured) are dropped, so the export never pairs one state's cover with another's text.
-                    const ingredients = coverExport.source === coverSource ? coverExport : NO_COVER_EXPORT;
-                    let coverBlock;
-                    switch (resolveArcaCoverPlacement({ captionShown: captionModel.show, ...ingredients })) {
-                        case ARCA_COVER_PLACEMENT.OVERLAY:
-                            coverBlock = renderArcaCoverOverlay(captionModel, {
-                                backgroundUrl: ingredients.backgroundUrl,
-                                coverSize: ingredients.coverSize,
-                                surface: resolveCoverCaptionSurface({
-                                    backgroundType: bgType,
-                                    solidColor: bgColor,
-                                    gradientStartColor: document.getElementById('gradient-start').value,
-                                    textColor
-                                }),
-                                colors: captionColors
-                            });
-                            break;
-                        case ARCA_COVER_PLACEMENT.BAKED:
-                            coverBlock = coverImageOf(ingredients.bakedSource);
-                            break;
-                        case ARCA_COVER_PLACEMENT.PLAIN:
-                            coverBlock = coverImageOf(coverSource);
-                            break;
-                        default:
-                            coverBlock = coverImageOf(coverSource) + renderArcaCoverCaption(captionModel, { colors: captionColors });
-                    }
-                    html += `<div style="margin:0 0 24px;text-align:center;">${coverBlock}</div>`;
+                    html += `<div style="margin:0 0 24px;text-align:center;">${coverImage}${caption}</div>`;
                 }
                 const titleFont = resolveTitleFontFamily(presentation);
                 const titleFontStyle = titleFont ? `font-family:${titleFont};` : '';
