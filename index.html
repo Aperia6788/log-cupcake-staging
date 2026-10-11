@@ -3581,7 +3581,7 @@ USER: "반가워요."
                                 </div>
                                 <p class="presentation-hint">추가 캐릭터는 각자의 말풍선 배경색을 그대로 씁니다. 배경은 화자를 따르고 글자색은 대사 종류(대사·생각·통신)를 따릅니다.</p>
                             </div>
-                            <p class="presentation-hint">말풍선 없이 본문을 이어 읽습니다. 추가 캐릭터는 이름 색을 사용하고, 생각·통신 색은 기존 설정을 따릅니다.</p>
+                            <p class="presentation-hint">말풍선 없이 본문을 이어 읽습니다. 추가 캐릭터는 이름 색을 사용하고, 생각·통신 색은 캐릭터마다 🎨 색상 설정에서 정합니다.</p>
                         </div>
                         <div class="input-group">
                             <label class="input-label" for="profile-layout">상단 이미지 구성 · 두 모드 공통</label>
@@ -6083,22 +6083,29 @@ USER: "반가워요."
         return value
             .filter(character => Boolean(character) && typeof character === 'object' && !Array.isArray(character))
             // `withFolder` keeps the optional settings-panel folder and adds no key when unfiled.
-            .map((character, index) => withFolder({
-                // Derived from position, never from the stored value. Deleting a character
-                // already renumbers the rest, so position is the only id that stays true.
-                id: formatCharacterId(index),
-                name: typeof character.name === 'string' ? character.name : `캐릭터${index + 1}`,
-                bgColor: normalizeHexColor(character.bgColor, DEFAULT_CHARACTER_COLORS.bgColor),
-                textColor: normalizeHexColor(character.textColor, DEFAULT_CHARACTER_COLORS.textColor),
-                nameColor: normalizeHexColor(character.nameColor, DEFAULT_CHARACTER_COLORS.nameColor),
-                commColor: normalizeHexColor(character.commColor, DEFAULT_CHARACTER_COLORS.commColor),
-                avatarData: normalizeText(character.avatarData),
-                avatarShape: AVATAR_SHAPES.includes(character.avatarShape)
-                    ? character.avatarShape
-                    : DEFAULT_AVATAR_SHAPE,
-                bio: normalizeText(character.bio),
-                _open: character._open === true
-            }, character.folder));
+            .map((character, index) => {
+                const nameColor = normalizeHexColor(character.nameColor, DEFAULT_CHARACTER_COLORS.nameColor);
+                return withFolder({
+                    // Derived from position, never from the stored value. Deleting a character
+                    // already renumbers the rest, so position is the only id that stays true.
+                    id: formatCharacterId(index),
+                    name: typeof character.name === 'string' ? character.name : `캐릭터${index + 1}`,
+                    bgColor: normalizeHexColor(character.bgColor, DEFAULT_CHARACTER_COLORS.bgColor),
+                    textColor: normalizeHexColor(character.textColor, DEFAULT_CHARACTER_COLORS.textColor),
+                    nameColor,
+                    commColor: normalizeHexColor(character.commColor, DEFAULT_CHARACTER_COLORS.commColor),
+                    // One colour paints both the thought bubble and its text. Characters saved before
+                    // it existed drew thoughts in their name colour (the Arca copy did, at least), so
+                    // that is what they inherit — no stored log changes its exported look on upgrade.
+                    thoughtColor: normalizeHexColor(character.thoughtColor, nameColor),
+                    avatarData: normalizeText(character.avatarData),
+                    avatarShape: AVATAR_SHAPES.includes(character.avatarShape)
+                        ? character.avatarShape
+                        : DEFAULT_AVATAR_SHAPE,
+                    bio: normalizeText(character.bio),
+                    _open: character._open === true
+                }, character.folder);
+            });
     }
 
     // This app-layer module owns canvas-based avatar cropping and cache-size reduction.
@@ -6375,7 +6382,7 @@ USER: "반가워요."
             }
 
             // ========== Additional character management ==========
-            let extraCharacters = []; // {id: 'CHAR-01', name: '캐릭터1', bgColor: '#...', textColor: '#...', nameColor: '#...', commColor: '#...'}
+            let extraCharacters = []; // {id: 'CHAR-01', name: '캐릭터1', bgColor: '#...', textColor: '#...', nameColor: '#...', commColor: '#...', thoughtColor: '#...'}
             let botAvatarData = '';
             let personaAvatarData = '';
 
@@ -6422,6 +6429,7 @@ USER: "반가워요."
                     textColor: '#1d2129',
                     nameColor: '#868e96',
                     commColor: '#20c997',
+                    thoughtColor: '#868e96',
                     avatarData: '',
                     avatarShape: 'rounded',
                     bio: '',
@@ -6609,6 +6617,13 @@ USER: "반가워요."
                             <input type="text" id="char-comm-text" value="${char.commColor || '#20c997'}" onchange="updateCharColor(${index}, 'commColor', this.value)">
                         </div>
                     </div>
+                    <div class="input-group">
+                        <label class="input-label">생각 색상</label>
+                        <div class="color-row">
+                            <input type="color" id="char-thought-color" value="${char.thoughtColor}" onchange="updateCharColor(${index}, 'thoughtColor', this.value)">
+                            <input type="text" id="char-thought-text" value="${char.thoughtColor}" onchange="updateCharColor(${index}, 'thoughtColor', this.value)">
+                        </div>
+                    </div>
                     <div style="display:flex; gap:8px; margin-top:15px;">
                         <button class="btn btn-secondary" onclick="randomizeCharColors(${index})" style="flex:1;">🎲 랜덤</button>
                         <button class="btn btn-primary" onclick="closeCharColorPopup()" style="flex:1;">확인</button>
@@ -6631,6 +6646,7 @@ USER: "반가워요."
                 extraCharacters[index].textColor = colors.textColor;
                 extraCharacters[index].nameColor = colors.nameColor;
                 extraCharacters[index].commColor = colors.commColor;
+                extraCharacters[index].thoughtColor = colors.thoughtColor;
 
                 // Update input field within popup
                 document.getElementById('char-bg-color').value = colors.bgColor;
@@ -6641,6 +6657,8 @@ USER: "반가워요."
                 document.getElementById('char-name-text').value = colors.nameColor;
                 document.getElementById('char-comm-color').value = colors.commColor;
                 document.getElementById('char-comm-text').value = colors.commColor;
+                document.getElementById('char-thought-color').value = colors.thoughtColor;
+                document.getElementById('char-thought-text').value = colors.thoughtColor;
 
                 requestLogRender();
             }
@@ -6653,7 +6671,7 @@ USER: "반가워요."
                 // Light background vs dark background random selection
                 const isDarkBg = Math.random() > 0.5;
 
-                let bgColor, textColor, nameColor, commColor;
+                let bgColor, textColor, nameColor, commColor, thoughtColor;
 
                 if (isDarkBg) {
                     // Dark background: colors with low saturation and low brightness
@@ -6668,6 +6686,8 @@ USER: "반가워요."
                     const nameHue = (baseHue + 30 + Math.floor(Math.random() * 60)) % 360; // Analogous or complementary colors
                     nameColor = hslToHex(nameHue, 60 + Math.floor(Math.random() * 30), 60 + Math.floor(Math.random() * 20));
                     commColor = hslToHex((nameHue + 30) % 360, 60 + Math.floor(Math.random() * 25), 58 + Math.floor(Math.random() * 14));
+                    // The thought bubble is see-through, so it sits on the same log background as the name.
+                    thoughtColor = hslToHex((nameHue + 330) % 360, 45 + Math.floor(Math.random() * 30), 62 + Math.floor(Math.random() * 14));
                 } else {
                     // Light background: low saturation, high brightness colors
                     const bgSat = 20 + Math.floor(Math.random() * 40); // 20-60
@@ -6681,9 +6701,10 @@ USER: "반가워요."
                     const nameHue = (baseHue + 30 + Math.floor(Math.random() * 60)) % 360;
                     nameColor = hslToHex(nameHue, 50 + Math.floor(Math.random() * 40), 35 + Math.floor(Math.random() * 25));
                     commColor = hslToHex((nameHue + 30) % 360, 55 + Math.floor(Math.random() * 25), 42 + Math.floor(Math.random() * 16));
+                    thoughtColor = hslToHex((nameHue + 330) % 360, 40 + Math.floor(Math.random() * 30), 38 + Math.floor(Math.random() * 16));
                 }
 
-                return { bgColor, textColor, nameColor, commColor };
+                return { bgColor, textColor, nameColor, commColor, thoughtColor };
             }
 
 
@@ -7541,7 +7562,7 @@ USER: "반가워요."
         const character = speaker.kind === 'character' ? characters[speaker.index] : null;
         const identity = speaker.kind === 'character'
             ? character ? { name: character.name, color: character.nameColor,
-                thoughtColor: character.nameColor, commColor: character.commColor || ai.commColor,
+                thoughtColor: character.thoughtColor || character.nameColor, commColor: character.commColor || ai.commColor,
                 // An extra character already owns a bubble fill; reusing it keeps one colour per
                 // character instead of asking for a second one that must be kept in sync by hand.
                 background: character.bgColor }
@@ -8215,7 +8236,10 @@ USER: "반가워요."
                         } else if (bubble.kind === 'shout') {
                             currentBubbles.push(`<div class="bubble shout" style="${baseStyle}">${processMarkdown(bubble.content)}</div>`);
                         } else if (bubble.kind === 'thought' || bubble.kind === 'plain') {
-                            currentBubbles.push(`<div class="bubble thought" style="background:transparent;color:${char.nameColor};border:1px dashed ${char.nameColor};">${processMarkdown(bubble.content)}</div>`);
+                            // The stylesheet paints `.bubble.thought` text and the vintage wavy border from
+                            // `--thought-color` with !important, so the character's colour has to arrive as
+                            // that variable — a plain inline `color` lost to it and showed the global one.
+                            currentBubbles.push(`<div class="bubble thought" style="background:transparent;--thought-color:${char.thoughtColor};border:1px dashed ${char.thoughtColor};">${processMarkdown(bubble.content)}</div>`);
                         } else {
                             currentBubbles.push(`<div class="bubble dialogue" style="${baseStyle}">${processMarkdown(bubble.content)}</div>`);
                         }
@@ -9662,7 +9686,7 @@ USER: "반가워요."
                                 } else if (bubble.kind === 'shout') {
                                     bubbleStyle = `background-color:transparent !important;box-shadow:inset 0 0 0 1000px ${char.bgColor};color:${char.textColor} !important;padding:10px 14px;border-radius:12px;margin:8px 0;display:block;max-width:100%;box-sizing:border-box;width:fit-content;font-weight:bold;font-size:1.1em;border:2px solid ${char.bgColor};`;
                                 } else if (bubble.kind === 'thought' || bubble.kind === 'plain') {
-                                    bubbleStyle = `background-color:transparent !important;color:${char.nameColor} !important;padding:10px 14px;border-radius:12px;margin:8px 0;display:block;max-width:100%;box-sizing:border-box;width:fit-content;font-style:italic;border:1px dashed ${char.nameColor};`;
+                                    bubbleStyle = `background-color:transparent !important;color:${char.thoughtColor} !important;padding:10px 14px;border-radius:12px;margin:8px 0;display:block;max-width:100%;box-sizing:border-box;width:fit-content;font-style:italic;border:1px dashed ${char.thoughtColor};`;
                                 }
 
                                 currentBubbles.push(`<div style="${bubbleStyle}">${processMarkdownArca(bubbleContent)}</div>`);
