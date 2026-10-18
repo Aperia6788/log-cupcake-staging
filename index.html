@@ -9151,6 +9151,26 @@ USER: "반가워요."
                 alert('초기화되었습니다!');
             }
 
+    // Characters Arca's server refuses to save. A post body holding one is rejected with
+    // "내용에 금지된 문구가 포함되어 있습니다. []" — the brackets look empty because the match is
+    // invisible — and AI-written logs carry them without the author ever seeing them.
+    //
+    // Measured 2026-10-18 on the designated write-test article, through both routes the copy
+    // buttons hand users (normal-editor paste and </> HTML mode), with the submitted request bytes
+    // captured: U+2060 and U+FEFF are refused. U+200B never reached the server because Arca's
+    // editor deletes it first; it is stripped here as well so the copy does not lean on that
+    // editor cleanup. U+200C, U+200D, U+200E and U+00AD are entity-encoded by the editor and
+    // saved, and U+200D is what joins composite emoji (the family emoji, the rainbow flag) — Arca
+    // stores and renders those as one emoji, so it must never join this list. Re-measure on Arca
+    // before widening it.
+    const ARCA_REJECTED_CHARACTERS = Object.freeze(['\u2060', '\uFEFF', '\u200B']);
+
+    const REJECTED_PATTERN = new RegExp(`[${ARCA_REJECTED_CHARACTERS.join('')}]`, 'g');
+
+    function stripArcaRejectedCharacters(text) {
+        return text.replace(REJECTED_PATTERN, '');
+    }
+
     const ARCA_AVATAR_SIZE = 160;
 
     function renderArcaAvatar(source, radius) {
@@ -9778,7 +9798,10 @@ USER: "반가워요."
                 html += `</div>`;
 
                 html += `</div></div>`;
-                return html;
+                // Applied to the finished string so every text source (lines, titles, captions,
+                // regex output) is covered, for both copy buttons and both clipboard flavours.
+                // The preview and the PNG keep the author's text exactly as typed.
+                return stripArcaRejectedCharacters(html);
             }
 
     // The catalogue of app-UI designs the owner can preview and choose (2026-10-02). A skin restyles
