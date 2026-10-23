@@ -9161,9 +9161,13 @@ USER: "반가워요."
     // editor deletes it first; it is stripped here as well so the copy does not lean on that
     // editor cleanup. U+200C, U+200D, U+200E and U+00AD are entity-encoded by the editor and
     // saved, and U+200D is what joins composite emoji (the family emoji, the rainbow flag) — Arca
-    // stores and renders those as one emoji, so it must never join this list. Re-measure on Arca
-    // before widening it.
-    const ARCA_REJECTED_CHARACTERS = Object.freeze(['\u2060', '\uFEFF', '\u200B']);
+    // stores and renders those as one emoji, so it must never join this list.
+    //
+    // Re-measured 2026-10-24 after a log copied from v1.5.1 was refused again: one save holding
+    // every fully-qualified emoji (Unicode 18.0) plus every other bidi/format character was refused
+    // for U+202E (right-to-left override) alone, and the same body without it saved. U+202A–U+202D,
+    // U+200F and U+2066–U+2069 save, so they stay. Re-measure on Arca before widening it.
+    const ARCA_REJECTED_CHARACTERS = Object.freeze(['\u2060', '\uFEFF', '\u200B', '\u202E']);
 
     const REJECTED_PATTERN = new RegExp(`[${ARCA_REJECTED_CHARACTERS.join('')}]`, 'g');
 
