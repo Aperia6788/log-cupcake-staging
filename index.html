@@ -9152,27 +9152,51 @@ USER: "반가워요."
             }
 
     // Characters Arca's server refuses to save. A post body holding one is rejected with
-    // "내용에 금지된 문구가 포함되어 있습니다. []" — the brackets look empty because the match is
-    // invisible — and AI-written logs carry them without the author ever seeing them.
+    // "내용에 금지된 문구가 포함되어 있습니다. [...]", and AI-written logs carry them without the
+    // author ever noticing. Every member below is a measured refusal on the designated write-test
+    // article, never a guess: widening the set deletes text Arca would have kept.
     //
-    // Measured 2026-10-18 on the designated write-test article, through both routes the copy
-    // buttons hand users (normal-editor paste and </> HTML mode), with the submitted request bytes
-    // captured: U+2060 and U+FEFF are refused. U+200B never reached the server because Arca's
-    // editor deletes it first; it is stripped here as well so the copy does not lean on that
-    // editor cleanup. U+200C, U+200D, U+200E and U+00AD are entity-encoded by the editor and
-    // saved, and U+200D is what joins composite emoji (the family emoji, the rainbow flag) — Arca
-    // stores and renders those as one emoji, so it must never join this list.
+    // Measured 2026-10-18 through both routes the copy buttons hand users (normal-editor paste and
+    // </> HTML mode), with the submitted request bytes captured: U+2060 and U+FEFF are refused.
+    // U+200B never reached the server because Arca's editor deletes it first; it is stripped here
+    // as well so the copy does not lean on that editor cleanup. U+200C, U+200D, U+200E and U+00AD
+    // are entity-encoded by the editor and saved, and U+200D is what joins composite emoji (the
+    // family emoji, the rainbow flag) — Arca stores and renders those as one emoji, so it must
+    // never join this list.
     //
-    // Re-measured 2026-10-24 after a log copied from v1.5.1 was refused again: one save holding
-    // every fully-qualified emoji (Unicode 18.0) plus every other bidi/format character was refused
-    // for U+202E (right-to-left override) alone, and the same body without it saved. U+202A–U+202D,
-    // U+200F and U+2066–U+2069 save, so they stay. Re-measure on Arca before widening it.
-    const ARCA_REJECTED_CHARACTERS = Object.freeze(['\u2060', '\uFEFF', '\u200B', '\u202E']);
+    // Re-measured 2026-10-24: every fully-qualified emoji plus every bidi/format character in one
+    // save was refused for U+202E (right-to-left override) alone. U+202A–U+202D, U+200F and
+    // U+2066–U+2069 save, so they stay.
+    //
+    // Re-measured 2026-10-28 over EVERY assigned code point (all 339 Unicode blocks, one block per
+    // unit, refused units halved down to the character): the server now also answers
+    // "[(사용할 수 없는 유니코드 문자)]" — a rule that names nothing — for any character of the Tamil
+    // block, and names U+02DB (ogonek) the old way. Every other block saves, including Tamil
+    // Supplement, the rest of Spacing Modifier Letters, and every emoji of every status. Unlike the
+    // invisible ones these two are VISIBLE, which is why callers can count what was removed.
+    // Re-measure on Arca before widening or narrowing anything here.
+    const ARCA_REJECTED_CODE_POINTS = Object.freeze([0x2060, 0xFEFF, 0x200B, 0x202E, 0x02DB]);
 
-    const REJECTED_PATTERN = new RegExp(`[${ARCA_REJECTED_CHARACTERS.join('')}]`, 'g');
+    const ARCA_REJECTED_RANGES = Object.freeze([
+        Object.freeze({ script: 'Tamil', first: 0x0B80, last: 0x0BFF })
+    ]);
+
+    const ARCA_REJECTED_CHARACTERS = Object.freeze(ARCA_REJECTED_CODE_POINTS.map(code => String.fromCodePoint(code)));
+
+    // Built from the numbers above at load time, so this source file never holds the raw
+    // characters themselves (an editing tool can silently turn a typed escape into one).
+    const REJECTED_PATTERN = new RegExp(`[${[
+    ...ARCA_REJECTED_CHARACTERS,
+    ...ARCA_REJECTED_RANGES.map(range => `${String.fromCodePoint(range.first)}-${String.fromCodePoint(range.last)}`)
+].join('')}]`, 'gu');
 
     function stripArcaRejectedCharacters(text) {
         return text.replace(REJECTED_PATTERN, '');
+    }
+
+    // How many code points stripArcaRejectedCharacters would remove from this text.
+    function countArcaRejectedCharacters(text) {
+        return (text.match(REJECTED_PATTERN) || []).length;
     }
 
     const ARCA_AVATAR_SIZE = 160;
@@ -9217,7 +9241,7 @@ USER: "반가워요."
             // ========== Copy style (direct paste) ==========
             // Resolves to whether the export reached the clipboard by any route.
             async function copyStyled() {
-                const html = generateArcaHTML();
+                const { html, removedCount } = generateArcaExport();
 
                 try {
                     // Rich copy, so a paste into the Arca editor keeps its styling.
@@ -9236,14 +9260,23 @@ USER: "반가워요."
 
                 // Announced outside the try on purpose. Inside it, a throwing alert would be
                 // caught as a copy failure and trigger a redundant second copy.
-                alert('복사 완료! 🧁\n아카라이브의 일반 편집기에 Ctrl+V로 붙여넣으세요.\n이미지가 있으면 자동 업로드가 끝나고 모두 표시된 뒤 글을 저장하세요.');
+                alert('복사 완료! 🧁\n아카라이브의 일반 편집기에 Ctrl+V로 붙여넣으세요.\n이미지가 있으면 자동 업로드가 끝나고 모두 표시된 뒤 글을 저장하세요.' + describeRemovedCharacters(removedCount));
                 return true;
+            }
+
+            // Some refused characters are visible (Tamil text, U+02DB), so the user is told they were
+            // dropped instead of finding words missing from the post. One count covers the invisible
+            // ones too; a copy that removed nothing says nothing about it.
+            function describeRemovedCharacters(removedCount) {
+                return removedCount > 0
+                    ? `\n\n아카라이브가 저장을 거부하는 문자 ${removedCount}개를 빼고 복사했어요. (보이지 않는 문자·타밀 문자 등 — 미리보기는 그대로예요)`
+                    : '';
             }
 
             // ========== Copy HTML for Arca Live ==========
             // Resolves to whether the export reached the clipboard.
             async function copyArcaHTML() {
-                const html = generateArcaHTML();
+                const { html, removedCount } = generateArcaExport();
 
                 if (!await writeClipboardText(html)) {
                     alert('클립보드 복사에 실패했습니다.\n브라우저의 클립보드 권한을 확인해 주세요.');
@@ -9253,7 +9286,7 @@ USER: "반가워요."
                 const imageNotice = /<img\b[^>]*\bsrc="data:image\//i.test(html)
                     ? '\n\n업로드한 이미지가 포함되어 있어요. HTML 모드로 넣으면 아카라이브 저장 시 이미지가 사라집니다.\n이미지도 올리려면 이 앱의 ✨ 복사 버튼으로 다시 복사한 뒤 일반 편집기에 붙여넣으세요. 자동 업로드가 끝난 뒤 저장하세요.\n✨ 복사를 지원하지 않는 브라우저에서는 다른 브라우저로 복사하거나 아카라이브에서 이미지를 직접 첨부해 주세요.'
                     : '';
-                alert('아카라이브용 HTML이 복사되었습니다!' + imageNotice + '\n\nHTML 붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
+                alert('아카라이브용 HTML이 복사되었습니다!' + describeRemovedCharacters(removedCount) + imageNotice + '\n\nHTML 붙여넣기 방법:\n1. 아카라이브 게시글 작성\n2. 에디터 상단 </> 버튼 클릭 (HTML 모드)\n3. Ctrl+V로 붙여넣기\n4. 다시 </> 버튼 클릭해서 미리보기');
                 return true;
             }
 
@@ -9802,10 +9835,16 @@ USER: "반가워요."
                 html += `</div>`;
 
                 html += `</div></div>`;
-                // Applied to the finished string so every text source (lines, titles, captions,
-                // regex output) is covered, for both copy buttons and both clipboard flavours.
-                // The preview and the PNG keep the author's text exactly as typed.
-                return stripArcaRejectedCharacters(html);
+                return html;
+            }
+
+            // The export exactly as both copy buttons hand it to the clipboard. The strip runs on the
+            // finished string so every text source (lines, titles, captions, regex output) is covered
+            // for both buttons and both clipboard flavours; the count feeds the copy notice. The
+            // preview and the PNG keep the author's text exactly as typed.
+            function generateArcaExport() {
+                const html = generateArcaHTML();
+                return { html: stripArcaRejectedCharacters(html), removedCount: countArcaRejectedCharacters(html) };
             }
 
     // The catalogue of app-UI designs the owner can preview and choose (2026-10-02). A skin restyles
